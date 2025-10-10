@@ -1,0 +1,36 @@
+{
+  "name": "keylime-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for Keylime remote attestation",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "keylime-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "keylime",
+    "mcp",
+    "attestation",
+    "tpm",
+    "security",
+    "model-context-protocol"
+  ],
+  "author": "Keylime Project",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
