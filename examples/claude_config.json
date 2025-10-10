@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "keylime": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/keylime-mcp/dist/index.js"
+      ],
+      "description": "Keylime remote attestation MCP server"
+    }
+  }
+}
