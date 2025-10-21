@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    container_name: keylime-mcp-backend
+    ports:
+      - "8080:8080"
+    networks:
+      - keylime-network
+
+  frontend:
+    build: ./frontend
+    container_name: keylime-mcp-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - keylime-network
+
+networks:
+  keylime-network:
+    driver: bridge
+
