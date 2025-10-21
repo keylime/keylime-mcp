@@ -4,37 +4,35 @@ Model Context Protocol interface for Keylime.
 
 ## Quick Start
 
-### With Docker
-
 ```bash
 make build
 make up
 ```
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8080/
+Access at http://localhost:3000
 
-### Local Development
+The Makefile automatically works with Docker or Podman.
 
-**Backend:**
+## Development
+
+Run locally without containers:
+
 ```bash
-cd backend
-go run main.go
-```
+# Backend
+cd backend && go run main.go
 
-**Frontend:**
-```bash
-cd frontend
-pnpm dev
+# Frontend
+cd frontend && pnpm dev
 ```
 
 ## Commands
 
 - `make build` - Build containers
 - `make up` - Start containers
-- `make down` - Stop containers
+- `make down` - Stop containers  
 - `make logs` - View logs
 - `make clean` - Remove everything
+- `make help` - Show all commands
 
 ## Stack
 

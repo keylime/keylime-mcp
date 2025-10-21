@@ -1,6 +1,24 @@
+# Dependencies
 node_modules/
+
+# Build
 dist/
-*.log
+*.out
+
+# Go
+*.exe
+*.test
+
+# Environment
 .env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
 
+# Logs
+*.log
