@@ -8,10 +8,20 @@ services:
       - keylime-network
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: builder
     container_name: keylime-mcp-frontend
     ports:
-      - "3000:80"
+      - "3000:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+    command: pnpm dev --host
     depends_on:
       - backend
     networks:
