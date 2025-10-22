@@ -2,6 +2,11 @@
 
 Model Context Protocol interface for Keylime.
 
+## Prerequisites
+
+- Podman
+- Keylime
+
 ## Quick Start
 
 ```bash
@@ -32,6 +37,7 @@ cd frontend && pnpm dev
 - `make down` - Stop containers  
 - `make logs` - View logs
 - `make clean` - Remove everything
+- `make ps` - List containers"
 - `make help` - Show all commands
 
 ## Stack

@@ -1,35 +1,36 @@
-.PHONY: help build up down logs clean dev-backend dev-frontend
+.PHONY: help build up down logs clean ps
 
-# Detect container runtime (Podman first, then Docker)
 PODMAN := $(shell command -v podman 2>/dev/null)
-DOCKER := $(shell command -v docker 2>/dev/null)
-COMPOSE := $(if $(PODMAN),podman-compose,$(if $(DOCKER),docker compose,))
 
-ifeq ($(COMPOSE),)
-$(error No container runtime found. Please install podman or docker)
+ifeq ($(PODMAN),)
+$(error Podman not found. Install: sudo dnf install podman podman-compose)
 endif
 
 help:
-	@echo "Keylime MCP Commands:"
-	@echo "  make build  - Build containers (using $(COMPOSE))"
+	@echo "Keylime MCP (Podman)"
+	@echo "  make build  - Build containers"
 	@echo "  make up     - Start containers"
 	@echo "  make down   - Stop containers"
 	@echo "  make logs   - View logs"
-	@echo "  make clean  - Remove containers and volumes"
+	@echo "  make ps     - List containers"
+	@echo "  make clean  - Remove all"
 
 build:
-	$(COMPOSE) build
+	podman-compose -f compose.yml build
 
 up:
-	$(COMPOSE) up -d
-	@echo "Started on http://localhost:3000"
+	podman-compose -f compose.yml up -d
+	@echo "http://localhost:3000"
 
 down:
-	$(COMPOSE) down
+	podman-compose -f compose.yml down
 
 logs:
-	$(COMPOSE) logs -f
+	podman-compose -f compose.yml logs -f
+
+ps:
+	podman ps -a
 
 clean:
-	$(COMPOSE) down -v
-
+	podman-compose -f compose.yml down -v
+	podman system prune -f

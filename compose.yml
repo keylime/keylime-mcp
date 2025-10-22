@@ -6,6 +6,8 @@ services:
       - "8080:8080"
     networks:
       - keylime-network
+    security_opt:
+      - no-new-privileges:true
 
   frontend:
     build:
@@ -26,6 +28,8 @@ services:
       - backend
     networks:
       - keylime-network
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   keylime-network:
