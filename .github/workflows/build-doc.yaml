@@ -1,0 +1,45 @@
+---
+name: build
+
+"on":
+  push:
+    ignore-paths:
+      - '**.md'
+      - '**.sh'
+  pull_request:
+    ignore-paths:
+      - '**.md'
+      - '**.sh'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ ! matrix.stable }}
+    strategy:
+      matrix:
+        os:
+          - fedora:latest
+        stable: [true]
+        include:
+          - os: quay.io/fedora/fedora:rawhide
+            stable: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show OS information
+        run: |
+          cat /etc/os-release 2>/dev/null || \
+          echo /etc/os-release not available
+
+      - name: Install build dependencies
+        run: bash .github/workflows/install-dependencies
+
+      - name: Build documentation
+        run: |
+          make -C doc/slides
+
+    container:
+      image: ${{matrix.os}}
+      env:
+        DISTRO: ${{matrix.os}}
+      options: --privileged --device /dev/loop-control
