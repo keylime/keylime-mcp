@@ -3,11 +3,11 @@ name: build
 
 "on":
   push:
-    ignore-paths:
+    paths-ignore:
       - '**.md'
       - '**.sh'
   pull_request:
-    ignore-paths:
+    paths-ignore:
       - '**.md'
       - '**.sh'
 
