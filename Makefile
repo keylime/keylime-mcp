@@ -15,7 +15,13 @@ help:
 	@echo "  make ps     - List containers"
 	@echo "  make clean  - Remove all"
 
-build:
+.env:
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env from .env.example"; \
+	fi
+
+build: .env
 	podman-compose -f compose.yml build
 
 up:
