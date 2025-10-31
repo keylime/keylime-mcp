@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -30,24 +31,35 @@ func getAllAgents(ctx context.Context, req *mcp.CallToolRequest, _ getAllAgentsI
 	return nil, getAllAgentsOutput{Agents: agents.Results.UUIDs}, nil
 }
 
-// func getAgentStatus(ctx context.Context, req *mcp.CallToolRequest, input getAgentStatusInput) (
-// 	*mcp.CallToolResult,
-// 	AgentStatusResultsField,
-// 	error,
-// ) {
-// 	resp, err := keylimeClient.Get(fmt.Sprintf("agents/%s", input.AgentUUID))
-// 	if err != nil {
-// 		log.Printf("Error fetching agent status: %v", err)
-// 		return nil, AgentStatusResultsField{}, err
-// 	}
-// 	defer resp.Body.Close()
+func getAgentStatus(ctx context.Context, req *mcp.CallToolRequest, input getAgentStatusInput) (
+	*mcp.CallToolResult,
+	getAgentStatusOutput,
+	error,
+) {
+	resp, err := keylimeVerifierClient.Get(fmt.Sprintf("agents/%s", input.AgentUUID))
+	if err != nil {
+		log.Printf("Error fetching agent status: %v", err)
+		return nil, getAgentStatusOutput{}, err
+	}
+	defer resp.Body.Close()
 
-// 	var agentStatus getAgentStatusOutput
-// 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
-// 	if err != nil {
-// 		log.Printf("Error decoding agent status: %v", err)
-// 		return nil, AgentStatusResultsField{}, err
-// 	}
+	var agentStatus keylimeAgentStatusResponse
+	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
+	if err != nil {
+		log.Printf("Error decoding agent status: %v", err)
+		return nil, getAgentStatusOutput{}, err
+	}
 
-// 	return nil, AgentStatusResultsField{}, nil
-// }
+	return nil, getAgentStatusOutput{
+		AgentUUID:                   input.AgentUUID,
+		OperationalState:            agentStatus.Results.OperationalState,
+		OperationalStateDescription: stateToString(agentStatus.Results.OperationalState),
+		IP:                          agentStatus.Results.IP,
+		Port:                        agentStatus.Results.Port,
+		AttestationCount:            agentStatus.Results.AttestationCount,
+		LastReceivedQuote:           agentStatus.Results.LastReceivedQuote,
+		LastSuccessfulAttestation:   agentStatus.Results.LastSuccessfulAttestation,
+		SeverityLevel:               agentStatus.Results.SeverityLevel,
+		LastEventID:                 agentStatus.Results.LastEventID,
+	}, nil
+}
