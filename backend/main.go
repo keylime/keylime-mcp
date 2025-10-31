@@ -55,7 +55,7 @@ func newKeylimeClient() *KeylimeClient {
 		apiVersion: apiVersion,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // TODO TMP
 			},
 		},
 	}
@@ -67,57 +67,75 @@ func (kc *KeylimeClient) Get(endpoint string) (*http.Response, error) {
 	return kc.httpClient.Get(url)
 }
 
-func getAllAgents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+// func getAllAgents(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Access-Control-Allow-Origin", "*")
+// 	w.Header().Set("Content-Type", "application/json")
 
+// 	resp, err := keylimeClient.Get("agents")
+// 	if err != nil {
+// 		log.Printf("Error fetching agents: %v", err)
+// 		http.Error(w, "Failed to fetch agents: "+err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+// 	defer resp.Body.Close()
+
+// 	var agents interface{}
+// 	err = json.NewDecoder(resp.Body).Decode(&agents)
+// 	if err != nil {
+// 		log.Printf("Error decoding agents: %v", err)
+// 		http.Error(w, "Failed to decode agents response"+err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	json.NewEncoder(w).Encode(agents)
+// }
+
+type getAllAgentsInput struct{}
+type getAllAgentsOutput struct {
+	Agents []string `json:"agents"`
+}
+type keylimeAgentListResponse struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		UUIDs []string `json:"uuids"`
+	} `json:"results"`
+}
+
+func getAllAgents(ctx context.Context, req *mcp.CallToolRequest, _ getAllAgentsInput) (
+	*mcp.CallToolResult,
+	getAllAgentsOutput,
+	error,
+) {
 	resp, err := keylimeClient.Get("agents")
 	if err != nil {
 		log.Printf("Error fetching agents: %v", err)
-		http.Error(w, "Failed to fetch agents: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, getAllAgentsOutput{}, err
 	}
 	defer resp.Body.Close()
 
-	var agents interface{}
+	var agents keylimeAgentListResponse
 	err = json.NewDecoder(resp.Body).Decode(&agents)
 	if err != nil {
 		log.Printf("Error decoding agents: %v", err)
-		http.Error(w, "Failed to decode agents response"+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, getAllAgentsOutput{}, err
 	}
 
-	json.NewEncoder(w).Encode(agents)
-}
-
-type Input struct {
-	Name string `json:"name" jsonschema:"the name of the person to greet"`
-}
-
-type Output struct {
-	Greeting string `json:"greeting" jsonschema:"the greeting to tell to the user"`
-}
-
-func SayHi(ctx context.Context, req *mcp.CallToolRequest, input Input) (
-	*mcp.CallToolResult,
-	Output,
-	error,
-) {
-	return nil, Output{Greeting: "Hi " + input.Name}, nil
+	return nil, getAllAgentsOutput{Agents: agents.Results.UUIDs}, nil
 }
 
 func main() {
 	port := getEnv("PORT", "8080")
 	keylimeClient = newKeylimeClient()
 
-	server := mcp.NewServer(&mcp.Implementation{Name: "greeter", Version: "v1.0.0"}, nil)
-	mcp.AddTool(server, &mcp.Tool{Name: "greet", Description: "say hi"}, SayHi)
+	server := mcp.NewServer(&mcp.Implementation{Name: "Keylime", Version: "v1.0.0"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_all_agents", Description: "Retrieves a list of all registered agent UUIDs"}, getAllAgents)
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}
 
 	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/agents", getAllAgents)
+	// http.HandleFunc("/agents", getAllAgents)
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

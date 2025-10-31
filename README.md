@@ -11,7 +11,37 @@ This MCP server is a helper tool for working with Keylime. To actually interact 
 - Network access to the Keylime API endpoints
 - [Podman](https://podman.io/getting-started/installation) must be installed on your system.
 
-## Quick Start
+## Usage
+
+There are two ways to use this MCP server:
+
+### Option 1: With MCP Client (Claude Desktop, Cline, etc.)
+
+Build the server:
+```bash
+cd backend
+go build main.go
+```
+
+You can move the binary anywhere you want (e.g., `/usr/local/bin/keylime-mcp`).
+
+Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "keylime": {
+      "command": "/full/path/to/keylime-mcp/backend/keylime-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+**Replace `/full/path/to/keylime-mcp` with your actual path!**
+
+Restart your MCP client. Done.
+
+### Option 2: Web UI (Docker)
 
 ```bash
 make build
