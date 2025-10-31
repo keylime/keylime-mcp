@@ -20,7 +20,7 @@ There are two ways to use this MCP server:
 Build the server:
 ```bash
 cd backend
-go build main.go
+go build -o keylime-mcp *.go
 ```
 
 You can move the binary anywhere you want (e.g., `/usr/local/bin/keylime-mcp`).
@@ -55,7 +55,7 @@ Run locally without containers:
 
 ```bash
 # Backend
-cd backend && go run main.go
+cd backend && go run *.go
 
 # Frontend
 cd frontend && pnpm dev

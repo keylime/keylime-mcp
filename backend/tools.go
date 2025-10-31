@@ -29,3 +29,25 @@ func getAllAgents(ctx context.Context, req *mcp.CallToolRequest, _ getAllAgentsI
 
 	return nil, getAllAgentsOutput{Agents: agents.Results.UUIDs}, nil
 }
+
+// func getAgentStatus(ctx context.Context, req *mcp.CallToolRequest, input getAgentStatusInput) (
+// 	*mcp.CallToolResult,
+// 	AgentStatusResultsField,
+// 	error,
+// ) {
+// 	resp, err := keylimeClient.Get(fmt.Sprintf("agents/%s", input.AgentUUID))
+// 	if err != nil {
+// 		log.Printf("Error fetching agent status: %v", err)
+// 		return nil, AgentStatusResultsField{}, err
+// 	}
+// 	defer resp.Body.Close()
+
+// 	var agentStatus getAgentStatusOutput
+// 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
+// 	if err != nil {
+// 		log.Printf("Error decoding agent status: %v", err)
+// 		return nil, AgentStatusResultsField{}, err
+// 	}
+
+// 	return nil, AgentStatusResultsField{}, nil
+// }
