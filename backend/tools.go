@@ -13,7 +13,7 @@ func getAllAgents(ctx context.Context, req *mcp.CallToolRequest, _ getAllAgentsI
 	getAllAgentsOutput,
 	error,
 ) {
-	resp, err := keylimeClient.Get("agents")
+	resp, err := keylimeRegistrarClient.Get("agents")
 	if err != nil {
 		log.Printf("Error fetching agents: %v", err)
 		return nil, getAllAgentsOutput{}, err

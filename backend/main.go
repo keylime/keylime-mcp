@@ -8,11 +8,16 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-var keylimeClient *KeylimeClient
+var (
+	keylimeVerifierClient  *KeylimeClient
+	keylimeRegistrarClient *KeylimeClient
+)
 
 func main() {
-	port := getEnv("PORT", "8080")
-	keylimeClient = newKeylimeClient()
+	verifierBaseURL := getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881")
+	registrarBaseURL := getEnv("KEYLIME_REGISTRAR_URL", "https://localhost:8891")
+	keylimeVerifierClient = newKeylimeClient(verifierBaseURL)
+	keylimeRegistrarClient = newKeylimeClient(registrarBaseURL)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "Keylime", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_all_agents", Description: "Retrieves a list of all registered agent UUIDs"}, getAllAgents)
@@ -21,6 +26,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	port := getEnv("PORT", "8080")
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/agents", getAllAgentsHandler)
 	log.Printf("Server starting on port %s", port)

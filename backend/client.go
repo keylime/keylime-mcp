@@ -9,8 +9,7 @@ import (
 )
 
 // newKeylimeClient creates HTTP client for Keylime API
-func newKeylimeClient() *KeylimeClient {
-	baseURL := getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8891")
+func newKeylimeClient(baseURL string) *KeylimeClient {
 	apiVersion := getEnv("KEYLIME_API_VERSION", "v2.3")
 	return &KeylimeClient{
 		baseURL:    strings.TrimSuffix(baseURL, "/"),
