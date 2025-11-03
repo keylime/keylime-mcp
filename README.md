@@ -20,17 +20,17 @@ There are two ways to use this MCP server:
 Build the server:
 ```bash
 cd backend
-go build -o keylime-mcp *.go
+go build -o server *.go
 ```
 
-You can move the binary anywhere you want (e.g., `/usr/local/bin/keylime-mcp`).
+You can move the binary anywhere you want (e.g., `/usr/local/bin/server).
 
 Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
     "keylime": {
-      "command": "/full/path/to/keylime-mcp/backend/keylime-mcp",
+      "command": "/full/path/to/keylime-mcp/backend/server",
       "args": []
     }
   }
