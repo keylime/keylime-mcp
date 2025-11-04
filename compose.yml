@@ -5,6 +5,11 @@ services:
     network_mode: host
     env_file:
       - .env
+    environment:
+      - KEYLIME_CERT_DIR=/certs
+      - RUN_MODE=http
+    volumes:
+      - ${HOME}/.keylime/certs:/certs:ro,z
     security_opt:
       - no-new-privileges:true
 
