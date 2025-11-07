@@ -12,19 +12,14 @@ import (
 
 // newKeylimeClient creates HTTP client for Keylime API with mTLS support
 func newKeylimeClient(baseURL string) *KeylimeClient {
-	apiVersion := getEnv("KEYLIME_API_VERSION", "v2.3")
-
 	// Remove "http(s)://" prefix if present
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
 
-	// Check if TLS is enabled
-	tlsEnabled := getEnv("KEYLIME_TLS_ENABLED", "true") == "true"
-
 	var finalURL string
 	var httpClient *http.Client
 
-	if tlsEnabled {
+	if config.TLSEnabled {
 		finalURL = "https://" + strings.TrimSuffix(baseURL, "/")
 		tlsConfig := createTLSConfig()
 		httpClient = &http.Client{
@@ -39,7 +34,7 @@ func newKeylimeClient(baseURL string) *KeylimeClient {
 
 	return &KeylimeClient{
 		baseURL:    finalURL,
-		apiVersion: apiVersion,
+		apiVersion: config.APIVersion,
 		httpClient: httpClient,
 	}
 }
@@ -47,14 +42,8 @@ func newKeylimeClient(baseURL string) *KeylimeClient {
 // createTLSConfig creates TLS configuration with mTLS support
 // Equivalent to Python's HostNameIgnoreAdapter with SSL context
 func createTLSConfig() *tls.Config {
-	// Default certificate paths (same as Keylime default)
-	certDir := getEnv("KEYLIME_CERT_DIR", "/var/lib/keylime/cv_ca")
-	clientCert := getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt")
-	clientKey := getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem")
-	caCert := getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt")
-
 	// Load client certificate and key
-	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
+	cert, err := tls.LoadX509KeyPair(config.ClientCert, config.ClientKey)
 	if err != nil {
 		log.Printf("Warning: Failed to load client certificate: %v", err)
 		log.Printf("Attempting to connect without client cert (may fail with mTLS servers)")
@@ -65,7 +54,7 @@ func createTLSConfig() *tls.Config {
 	}
 
 	// Load CA certificate
-	caCertPEM, err := os.ReadFile(caCert)
+	caCertPEM, err := os.ReadFile(config.CAPath)
 	if err != nil {
 		log.Printf("Warning: Failed to load CA certificate: %v", err)
 		log.Printf("Using system CA pool")
@@ -79,15 +68,12 @@ func createTLSConfig() *tls.Config {
 		}
 	}
 
-	// Check if hostname verification should be ignored
-	ignoreHostname := getEnv("KEYLIME_IGNORE_HOSTNAME", "true") == "true"
-
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
 		// Ignore hostname verification (like Python's HostNameIgnoreAdapter)
 		// This is needed because Keylime certs often don't have correct hostname
-		InsecureSkipVerify: ignoreHostname,
+		InsecureSkipVerify: config.IgnoreHostname,
 	}
 
 	return tlsConfig
@@ -111,11 +97,4 @@ func (kc *KeylimeClient) Delete(endpoint string) (*http.Response, error) {
 		return nil, err
 	}
 	return kc.httpClient.Do(req)
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
