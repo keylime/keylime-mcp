@@ -134,3 +134,13 @@ type getAgentStatusOutput struct {
 	HasMeasuredBoot             bool    `json:"has_measured_boot"`
 	HasRuntimePolicy            bool    `json:"has_runtime_policy"`
 }
+
+type reactivateAgentInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type reactivateAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}

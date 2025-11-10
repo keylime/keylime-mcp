@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -86,8 +88,34 @@ func (kc *KeylimeClient) Get(endpoint string) (*http.Response, error) {
 
 func (kc *KeylimeClient) Post(endpoint string, body interface{}) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
-	// TODO: implement body marshaling
-	return kc.httpClient.Post(url, "application/json", nil)
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			return nil, fmt.Errorf("failed to marshal body: %w", err)
+		}
+	}
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return kc.httpClient.Do(req)
+}
+
+func (kc *KeylimeClient) Put(endpoint string, body interface{}) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			return nil, fmt.Errorf("failed to marshal body: %w", err)
+		}
+	}
+	req, err := http.NewRequest("PUT", url, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return kc.httpClient.Do(req)
 }
 
 func (kc *KeylimeClient) Delete(endpoint string) (*http.Response, error) {
