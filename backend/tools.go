@@ -82,3 +82,15 @@ func reactivate_agent(ctx context.Context, req *mcp.CallToolRequest, input react
 
 	return nil, response, nil
 }
+
+func agent_policies(ctx context.Context, req *mcp.CallToolRequest, input getAgentPoliciesInput) (
+	*mcp.CallToolResult,
+	getAgentPoliciesOutput,
+	error,
+) {
+	agentDetails, err := fetchAgentDetails(input.AgentUUID)
+	if err != nil {
+		return nil, getAgentPoliciesOutput{}, err
+	}
+	return nil, mapAgentToPolicies(input.AgentUUID, agentDetails), nil
+}

@@ -144,3 +144,19 @@ type reactivateAgentOutput struct {
 	Status  string   `json:"status"`
 	Results struct{} `json:"results"`
 }
+
+type getAgentPoliciesInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type getAgentPoliciesOutput struct {
+	AgentUUID                 string      `json:"agent_uuid"`
+	TPMPolicy                 interface{} `json:"tpm_policy"`
+	VTPMPolicy                interface{} `json:"vtpm_policy"`
+	MetaData                  interface{} `json:"meta_data"`
+	HasMeasuredBootPolicy     bool        `json:"has_measured_boot_policy"`
+	HasRuntimePolicy          bool        `json:"has_runtime_policy"`
+	AcceptedTPMHashAlgs       []string    `json:"accepted_tpm_hash_algs"`
+	AcceptedTPMEncryptionAlgs []string    `json:"accepted_tpm_encryption_algs"`
+	AcceptedTPMSigningAlgs    []string    `json:"accepted_tpm_signing_algs"`
+}

@@ -64,3 +64,32 @@ func mapAgentToOutput(agentUUID string, agentStatus keylimeAgentStatusResponse) 
 		HasRuntimePolicy:            agentStatus.Results.HasRuntimePolicy != 0,
 	}
 }
+
+func mapAgentToPolicies(agentUUID string, agentStatus keylimeAgentStatusResponse) getAgentPoliciesOutput {
+	return getAgentPoliciesOutput{
+		AgentUUID:                 agentUUID,
+		TPMPolicy:                 parseJSONString(agentStatus.Results.TPMPolicy),
+		VTPMPolicy:                parseJSONString(agentStatus.Results.VTPMPolicy),
+		MetaData:                  parseJSONString(agentStatus.Results.MetaData),
+		HasMeasuredBootPolicy:     agentStatus.Results.HasMbRefstate != 0,
+		HasRuntimePolicy:          agentStatus.Results.HasRuntimePolicy != 0,
+		AcceptedTPMHashAlgs:       agentStatus.Results.AcceptTPMHashAlgs,
+		AcceptedTPMEncryptionAlgs: agentStatus.Results.AcceptTPMEncryptionAlgs,
+		AcceptedTPMSigningAlgs:    agentStatus.Results.AcceptTPMSigningAlgs,
+	}
+}
+
+// parseJSONString converts a JSON string into a proper Go interface
+func parseJSONString(jsonStr string) interface{} {
+	if jsonStr == "" {
+		return map[string]interface{}{}
+	}
+
+	var result interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		log.Printf("Warning: Invalid JSON string: %v", err)
+		return map[string]interface{}{}
+	}
+
+	return result
+}
