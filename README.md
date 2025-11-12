@@ -4,12 +4,12 @@ A Model Context Protocol (MCP) server for [Keylime](https://keylime.dev), the re
 
 ## Requirements
 
-This MCP server is a helper tool for working with Keylime. To actually interact with a Keylime deployment, you need:
+This MCP server is a helper tool for working with Keylime. You need:
 
 - A running [Keylime verifier](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/security_hardening/assembly_ensuring-system-integrity-with-keylime_security-hardening#configuring-keylime-verifier_assembly_ensuring-system-integrity-with-keylime) and [Keylime registrar](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/security_hardening/assembly_ensuring-system-integrity-with-keylime_security-hardening#configuring-keylime-registrar_assembly_ensuring-system-integrity-with-keylime)
 - [Keylime agents](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/security_hardening/assembly_ensuring-system-integrity-with-keylime_security-hardening#configuring-keylime-agent_assembly_ensuring-system-integrity-with-keylime) to monitor
 - Network access to the Keylime API endpoints
-- [Podman](https://podman.io/getting-started/installation) must be installed on your system.
+- **MCP Client** (Claude Desktop, Cline, etc.) OR **[Podman](https://podman.io/getting-started/installation)** for containers
 
 ## Usage
 
@@ -19,8 +19,7 @@ There are two ways to use this MCP server:
 
 Build the server:
 ```bash
-cd backend
-go build -o server *.go
+make mcp
 ```
 
 You can move the binary anywhere you want (e.g., `/usr/local/bin/server).
@@ -31,7 +30,9 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
   "mcpServers": {
     "keylime": {
       "command": "/full/path/to/keylime-mcp/backend/server",
-      "args": []
+      "env": {
+        "KEYLIME_CERT_DIR": "/full/path/to/keylime/certs/dir"
+      }
     }
   }
 }
@@ -39,9 +40,11 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
 
 **Replace `/full/path/to/keylime-mcp` with your actual path!**
 
+**Replace `/full/path/to/keylime/certs/dir` with your cert directory!** Certs should be in `/var/lib/keylime/cv_ca` but need read permissions.
+
 Restart your MCP client. Done.
 
-### Option 2: Web UI (Docker)
+### Option 2: Web UI (Podman)
 
 ```bash
 make build
@@ -70,6 +73,7 @@ cd frontend && pnpm dev
 - `make clean` - Remove everything
 - `make ps` - List containers
 - `make help` - Show all commands
+- `make mcp` - Build MCP server binary file
 
 ## Stack
 
