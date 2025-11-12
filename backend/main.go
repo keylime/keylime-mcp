@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -58,7 +59,7 @@ func main() {
 }
 
 func loadConfig() {
-	certDir := getEnv("KEYLIME_CERT_DIR", "/home/msafarik/.keylime/certs") // TODO: Make this configurable or better way to set this (just for debugging purposes)
+	certDir := getEnv("KEYLIME_CERT_DIR", filepath.Join(os.Getenv("HOME"), ".keylime/certs")) // TODO: Make this configurable or better way to set this
 
 	config = Config{
 		VerifierURL:    getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881"),
