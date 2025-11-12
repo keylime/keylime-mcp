@@ -6,8 +6,7 @@ dist/
 *.out
 
 # Go
-*.exe
-*.test
+backend/server
 
 # Environment
 .env
