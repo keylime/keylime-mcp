@@ -73,7 +73,7 @@ cd frontend && pnpm dev
 - `make clean` - Remove everything
 - `make ps` - List containers
 - `make help` - Show all commands
-- `make mcp` - Build mcp server binary file
+- `make mcp` - Build MCP server binary file
 
 ## Stack
 
