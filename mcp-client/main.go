@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -64,24 +65,35 @@ func main() {
 	anthropicClient := anthropic.NewClient(
 		option.WithAPIKey(apiKey),
 	)
+	messages := []anthropic.MessageParam{}
+	if len(os.Args) <= 1 {
+		log.Fatal("Usage: go run main.go <content>")
+		return
+	}
+	content := strings.Join(os.Args[1:], " ")
+
+	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(content)))
 	message, err := anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.ModelClaude_3_Haiku_20240307,
 		MaxTokens: 256,
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock("Give me all failed agents")),
-		},
-		Tools: claudeTools,
+		Messages:  messages,
+		Tools:     claudeTools,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	assistantMessageContent := []anthropic.ContentBlockParamUnion{}
+	toolResults := []anthropic.ContentBlockParamUnion{}
+
 	for _, block := range message.Content {
 		switch block := block.AsAny().(type) {
 		case anthropic.TextBlock:
 			println(block.Text)
-			println()
+			assistantMessageContent = append(assistantMessageContent, anthropic.NewTextBlock(block.Text))
 		case anthropic.ToolUseBlock:
+			assistantMessageContent = append(assistantMessageContent, anthropic.NewToolUseBlock(block.ID, block.Input, block.Name))
+
 			params := &mcp.CallToolParams{
 				Name:      block.Name,
 				Arguments: block.Input,
@@ -93,9 +105,40 @@ func main() {
 			if res.IsError {
 				log.Fatal("tool failed")
 			}
+
 			for _, c := range res.Content {
 				log.Print(c.(*mcp.TextContent).Text)
 				println()
+			}
+
+			toolResults = append(toolResults, anthropic.NewToolResultBlock(
+				block.ID,
+				res.Content[0].(*mcp.TextContent).Text,
+				false,
+			))
+		}
+	}
+
+	if len(toolResults) > 0 {
+
+		messages = append(messages, anthropic.NewAssistantMessage(assistantMessageContent...))
+
+		messages = append(messages, anthropic.NewUserMessage(toolResults...))
+
+		message, err = anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
+			Model:     anthropic.ModelClaude_3_Haiku_20240307,
+			MaxTokens: 256,
+			Messages:  messages,
+			Tools:     claudeTools,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, block := range message.Content {
+			if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
+				println("\nFinal response:")
+				println(textBlock.Text)
 			}
 		}
 	}
