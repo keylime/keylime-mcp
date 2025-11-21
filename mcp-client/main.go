@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -13,133 +14,232 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const serverPath = "../backend/server"
+const (
+	serverPath       = "../backend/server"
+	mcpClientName    = "mcp-client"
+	mcpClientVersion = "v1.0.0"
+
+	claudeModel   = anthropic.ModelClaude_3_Haiku_20240307
+	maxTokens     = 1024
+	maxAgentTurns = 5
+
+	systemPrompt = `You are an autonomous agent with access to Keylime system management tools. Your goal is to help users manage and monitor their Keylime infrastructure.
+
+When given a task:
+1. Break it down into steps if needed
+2. Use available tools to gather information and take actions
+3. Chain multiple tool calls together to accomplish complex tasks
+4. Provide clear explanations of what you're doing and what you found
+5. If you encounter failures, investigate and suggest solutions`
+)
 
 func main() {
 	ctx := context.Background()
-	godotenv.Load("../.env")
+
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Printf("Warning: .env file not loaded: %v", err)
+	}
 
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY environment variable not set")
 	}
 
-	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
-		log.Fatalf("Server not found: %s", serverPath)
+	if len(os.Args) <= 1 {
+		log.Fatal("Usage: go run main.go <content>")
 	}
+	userQuery := strings.Join(os.Args[1:], " ")
 
-	// Connect to MCP server
-	client := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
-	transport := &mcp.CommandTransport{Command: exec.Command(serverPath)}
-	session, err := client.Connect(ctx, transport, nil)
+	session, err := connectToMCPServer(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to connect to MCP server: %v", err)
 	}
 	defer session.Close()
 
-	tools, _ := session.ListTools(ctx, &mcp.ListToolsParams{})
+	claudeTools, err := getMCPTools(ctx, session)
+	if err != nil {
+		log.Fatalf("Failed to get MCP tools: %v", err)
+	}
 
-	claudeTools := make([]anthropic.ToolUnionParam, 0)
+	anthropicClient := anthropic.NewClient(option.WithAPIKey(apiKey))
+
+	if err := runAgentLoop(ctx, anthropicClient, session, claudeTools, userQuery); err != nil {
+		log.Fatalf("Agent loop failed: %v", err)
+	}
+}
+
+// connectToMCPServer establishes connection to the MCP server
+func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
+	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("server not found: %s", serverPath)
+	}
+
+	client := mcp.NewClient(&mcp.Implementation{
+		Name:    mcpClientName,
+		Version: mcpClientVersion,
+	}, nil)
+
+	transport := &mcp.CommandTransport{Command: exec.Command(serverPath)}
+	session, err := client.Connect(ctx, transport, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+
+	log.Printf("Connected to MCP server: %s", serverPath)
+	return session, nil
+}
+
+// getMCPTools retrieves and converts MCP tools to Claude format
+func getMCPTools(ctx context.Context, session *mcp.ClientSession) ([]anthropic.ToolUnionParam, error) {
+	tools, err := session.ListTools(ctx, &mcp.ListToolsParams{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tools: %w", err)
+	}
+
+	var claudeTools []anthropic.ToolUnionParam
 	for _, tool := range tools.Tools {
-		inputSchemaMap, ok := tool.InputSchema.(map[string]interface{})
-		if !ok || inputSchemaMap == nil {
-			inputSchemaMap = map[string]interface{}{}
+		claudeTool := convertMCPToolToClaudeTool(tool)
+		claudeTools = append(claudeTools, claudeTool)
+	}
+
+	return claudeTools, nil
+}
+
+// convertMCPToolToClaudeTool converts a single MCP tool to Claude format
+func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
+	inputSchemaMap, ok := tool.InputSchema.(map[string]any)
+	if !ok || inputSchemaMap == nil {
+		inputSchemaMap = map[string]any{}
+	}
+
+	properties := inputSchemaMap["properties"]
+	required, _ := inputSchemaMap["required"].([]string)
+
+	toolParam := anthropic.ToolUnionParamOfTool(
+		anthropic.ToolInputSchemaParam{
+			Type:       "object",
+			Properties: properties,
+			Required:   required,
+		},
+		tool.Name,
+	)
+
+	toolParam.OfTool.Description = anthropic.String(tool.Description)
+	return toolParam
+}
+
+// runAgentLoop executes the main agent conversation loop
+func runAgentLoop(ctx context.Context, client anthropic.Client, session *mcp.ClientSession, tools []anthropic.ToolUnionParam, userQuery string) error {
+	messages := []anthropic.MessageParam{
+		anthropic.NewUserMessage(anthropic.NewTextBlock(userQuery)),
+	}
+
+	for _ = range maxAgentTurns {
+
+		message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+			Model:     claudeModel,
+			MaxTokens: maxTokens,
+			System:    []anthropic.TextBlockParam{{Type: "text", Text: systemPrompt}},
+			Messages:  messages,
+			Tools:     tools,
+		})
+		if err != nil {
+			return fmt.Errorf("claude API error: %w", err)
 		}
 
-		properties := inputSchemaMap["properties"]
-		required, _ := inputSchemaMap["required"].([]string)
+		assistantContent, toolResults, hasToolUse := processClaudeResponse(ctx, session, message)
 
-		toolParam := anthropic.ToolUnionParamOfTool(
-			anthropic.ToolInputSchemaParam{
-				Type:       "object",
-				Properties: properties,
-				Required:   required,
-			},
-			tool.Name,
-		)
+		if !hasToolUse {
+			break
+		}
 
-		toolParam.OfTool.Description = anthropic.String(tool.Description)
-
-		claudeTools = append(claudeTools, toolParam)
-	}
-	anthropicClient := anthropic.NewClient(
-		option.WithAPIKey(apiKey),
-	)
-	messages := []anthropic.MessageParam{}
-	if len(os.Args) <= 1 {
-		log.Fatal("Usage: go run main.go <content>")
-		return
-	}
-	content := strings.Join(os.Args[1:], " ")
-
-	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(content)))
-	message, err := anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.ModelClaude_3_Haiku_20240307,
-		MaxTokens: 256,
-		Messages:  messages,
-		Tools:     claudeTools,
-	})
-	if err != nil {
-		log.Fatal(err)
+		messages = append(messages, anthropic.NewAssistantMessage(assistantContent...))
+		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
 
-	assistantMessageContent := []anthropic.ContentBlockParamUnion{}
-	toolResults := []anthropic.ContentBlockParamUnion{}
+	return nil
+}
+
+// processClaudeResponse handles Claude's response and executes tool calls
+func processClaudeResponse(
+	ctx context.Context,
+	session *mcp.ClientSession,
+	message *anthropic.Message,
+) (
+	assistantContent []anthropic.ContentBlockParamUnion,
+	toolResults []anthropic.ContentBlockParamUnion,
+	hasToolUse bool,
+) {
+	assistantContent = []anthropic.ContentBlockParamUnion{}
+	toolResults = []anthropic.ContentBlockParamUnion{}
 
 	for _, block := range message.Content {
 		switch block := block.AsAny().(type) {
 		case anthropic.TextBlock:
-			println(block.Text)
-			assistantMessageContent = append(assistantMessageContent, anthropic.NewTextBlock(block.Text))
+			fmt.Println(block.Text)
+			assistantContent = append(assistantContent, anthropic.NewTextBlock(block.Text))
+
 		case anthropic.ToolUseBlock:
-			assistantMessageContent = append(assistantMessageContent, anthropic.NewToolUseBlock(block.ID, block.Input, block.Name))
+			hasToolUse = true
+			log.Printf("\n[Tool Use] %s", block.Name)
 
-			params := &mcp.CallToolParams{
-				Name:      block.Name,
-				Arguments: block.Input,
-			}
-			res, err := session.CallTool(ctx, params)
-			if err != nil {
-				log.Fatalf("CallTool failed: %v", err)
-			}
-			if res.IsError {
-				log.Fatal("tool failed")
-			}
+			assistantContent = append(assistantContent,
+				anthropic.NewToolUseBlock(block.ID, block.Input, block.Name))
 
-			for _, c := range res.Content {
-				log.Print(c.(*mcp.TextContent).Text)
-				println()
-			}
-
-			toolResults = append(toolResults, anthropic.NewToolResultBlock(
-				block.ID,
-				res.Content[0].(*mcp.TextContent).Text,
-				false,
-			))
+			toolResult := executeToolCall(ctx, session, block)
+			toolResults = append(toolResults, toolResult)
 		}
 	}
 
-	if len(toolResults) > 0 {
+	return assistantContent, toolResults, hasToolUse
+}
 
-		messages = append(messages, anthropic.NewAssistantMessage(assistantMessageContent...))
+// executeToolCall calls a tool via MCP and returns the result
+func executeToolCall(
+	ctx context.Context,
+	session *mcp.ClientSession,
+	toolUse anthropic.ToolUseBlock,
+) anthropic.ContentBlockParamUnion {
 
-		messages = append(messages, anthropic.NewUserMessage(toolResults...))
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      toolUse.Name,
+		Arguments: toolUse.Input,
+	})
 
-		message, err = anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
-			Model:     anthropic.ModelClaude_3_Haiku_20240307,
-			MaxTokens: 256,
-			Messages:  messages,
-			Tools:     claudeTools,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
+	if err != nil {
+		log.Printf("[Error] CallTool failed: %v", err)
+		return anthropic.NewToolResultBlock(
+			toolUse.ID,
+			fmt.Sprintf("Error: %v", err),
+			true,
+		)
+	}
 
-		for _, block := range message.Content {
-			if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
-				println("\nFinal response:")
-				println(textBlock.Text)
-			}
+	if result.IsError {
+		log.Printf("[Error] Tool execution failed")
+		return anthropic.NewToolResultBlock(
+			toolUse.ID,
+			"Tool execution failed",
+			true,
+		)
+	}
+
+	resultText := extractTextContent(result.Content)
+	log.Printf("================================================")
+	log.Printf("[Tool Result]\n%s", resultText)
+	log.Printf("================================================")
+
+	return anthropic.NewToolResultBlock(toolUse.ID, resultText, false)
+}
+
+func extractTextContent(content []mcp.Content) string {
+	var resultText strings.Builder
+
+	for _, c := range content {
+		if textContent, ok := c.(*mcp.TextContent); ok {
+			resultText.WriteString(textContent.Text)
 		}
 	}
+
+	return resultText.String()
 }
