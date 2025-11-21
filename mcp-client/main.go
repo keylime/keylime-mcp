@@ -19,8 +19,8 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	claudeModel   = anthropic.ModelClaude_3_Haiku_20240307
-	maxTokens     = 1024
+	claudeModel   = anthropic.ModelClaude3_5HaikuLatest
+	maxTokens     = 2048
 	maxAgentTurns = 5
 
 	systemPrompt = `You are an autonomous agent with access to Keylime system management tools. Your goal is to help users manage and monitor their Keylime infrastructure.
@@ -40,9 +40,9 @@ func main() {
 		log.Printf("Warning: .env file not loaded: %v", err)
 	}
 
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
 	if apiKey == "" {
-		log.Fatal("ANTHROPIC_API_KEY environment variable not set")
+		log.Fatal("ANTHROPIC_API_KEY environment variable not set or is empty after trimming whitespace")
 	}
 
 	if len(os.Args) <= 1 {
@@ -79,10 +79,25 @@ func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
 		Version: mcpClientVersion,
 	}, nil)
 
-	transport := &mcp.CommandTransport{Command: exec.Command(serverPath)}
+	cmd := exec.Command(serverPath)
+	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+
+	// Monitor server process for unexpected exits
+	if cmd.Process != nil {
+		go func() {
+			state, err := cmd.Process.Wait()
+			if err != nil {
+				log.Printf("[Warning] MCP server process monitoring failed: %v", err)
+			} else if !state.Success() {
+				log.Printf("[Error] MCP server process exited unexpectedly with status: %v", state)
+			} else {
+				log.Printf("[Info] MCP server process exited normally")
+			}
+		}()
 	}
 
 	log.Printf("Connected to MCP server: %s", serverPath)
@@ -113,7 +128,10 @@ func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
 	}
 
 	properties := inputSchemaMap["properties"]
-	required, _ := inputSchemaMap["required"].([]string)
+	var required []string
+	if r, ok := inputSchemaMap["required"].([]string); ok {
+		required = r
+	}
 
 	toolParam := anthropic.ToolUnionParamOfTool(
 		anthropic.ToolInputSchemaParam{
@@ -150,12 +168,13 @@ func runAgentLoop(ctx context.Context, client anthropic.Client, session *mcp.Cli
 		assistantContent, toolResults, hasToolUse := processClaudeResponse(ctx, session, message)
 
 		if !hasToolUse {
-			break
+			return nil
 		}
 
 		messages = append(messages, anthropic.NewAssistantMessage(assistantContent...))
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
+	finalMessage(ctx, client, messages)
 
 	return nil
 }
@@ -216,15 +235,19 @@ func executeToolCall(
 	}
 
 	if result.IsError {
-		log.Printf("[Error] Tool execution failed")
+		errorDetails := extractTextContent(result.Content)
+		log.Printf("[Error] Tool execution failed for tool '%s': %s", toolUse.Name, errorDetails)
 		return anthropic.NewToolResultBlock(
 			toolUse.ID,
-			"Tool execution failed",
+			fmt.Sprintf("Tool '%s' execution failed: %s", toolUse.Name, errorDetails),
 			true,
 		)
 	}
 
 	resultText := extractTextContent(result.Content)
+	if resultText == "" {
+		log.Printf("[Warning] Tool returned empty content - this might indicate an unexpected response from MCP server")
+	}
 	log.Printf("================================================")
 	log.Printf("[Tool Result]\n%s", resultText)
 	log.Printf("================================================")
@@ -232,6 +255,7 @@ func executeToolCall(
 	return anthropic.NewToolResultBlock(toolUse.ID, resultText, false)
 }
 
+// extractTextContent returns the concatenated text from all mcp.TextContent elements in the given slice.
 func extractTextContent(content []mcp.Content) string {
 	var resultText strings.Builder
 
@@ -242,4 +266,31 @@ func extractTextContent(content []mcp.Content) string {
 	}
 
 	return resultText.String()
+}
+
+// finalMessage asks LLM to summarize what happened during session if max turns are reached
+func finalMessage(ctx context.Context, client anthropic.Client, messages []anthropic.MessageParam) {
+
+	summaryPrompt := `I've reached the maximum number of allowed turns. Please provide a summary of:\n
+	1. What you accomplished so far
+	2. What still needs to be done
+	3. Any issues or blockers encountered`
+
+	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(summaryPrompt)))
+
+	finalMessage, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     claudeModel,
+		MaxTokens: maxTokens,
+		System:    []anthropic.TextBlockParam{{Type: "text", Text: systemPrompt}},
+		Messages:  messages,
+	})
+	if err != nil {
+		log.Printf("Failed to get final summary: %v", err)
+	} else {
+		for _, block := range finalMessage.Content {
+			if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
+				fmt.Println(textBlock.Text)
+			}
+		}
+	}
 }
