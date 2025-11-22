@@ -15,22 +15,23 @@ import (
 )
 
 const (
-	serverPath       = "../backend/server"
-	mcpClientName    = "mcp-client"
-	mcpClientVersion = "v1.0.0"
+	defaultServerPath = "../backend/server"
+	mcpClientName     = "mcp-client"
+	mcpClientVersion  = "v1.0.0"
 
 	claudeModel   = anthropic.ModelClaude3_5HaikuLatest
 	maxTokens     = 2048
 	maxAgentTurns = 5
 
-	systemPrompt = `You are an autonomous agent with access to Keylime system management tools. Your goal is to help users manage and monitor their Keylime infrastructure.
+	systemPrompt = `You are an AI assistant with access to Keylime system management tools. Your goal is to help users manage and monitor their Keylime infrastructure.
 
-When given a task:
+You have a maximum of 5 conversation turns to complete the task. When given a task:
 1. Break it down into steps if needed
 2. Use available tools to gather information and take actions
 3. Chain multiple tool calls together to accomplish complex tasks
 4. Provide clear explanations of what you're doing and what you found
-5. If you encounter failures, investigate and suggest solutions`
+5. If you encounter failures, investigate and suggest solutions
+6. Work efficiently to complete tasks within the turn limit`
 )
 
 func main() {
@@ -49,6 +50,10 @@ func main() {
 		log.Fatal("Usage: go run main.go <content>")
 	}
 	userQuery := strings.Join(os.Args[1:], " ")
+	userQuery = strings.TrimSpace(userQuery)
+	if userQuery == "" {
+		log.Fatal("Error: user query cannot be empty")
+	}
 
 	session, err := connectToMCPServer(ctx)
 	if err != nil {
@@ -70,6 +75,11 @@ func main() {
 
 // connectToMCPServer establishes connection to the MCP server
 func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
+	serverPath := os.Getenv("MCP_SERVER_PATH")
+	if serverPath == "" {
+		serverPath = defaultServerPath
+	}
+
 	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("server not found: %s", serverPath)
 	}
@@ -89,9 +99,12 @@ func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
 	// Monitor server process for unexpected exits
 	if cmd.Process != nil {
 		go func() {
-			state, err := cmd.Process.Wait()
-			if err != nil {
-				log.Printf("[Warning] MCP server process monitoring failed: %v", err)
+			state, waitErr := cmd.Process.Wait()
+			if ctx.Err() != nil {
+				return
+			}
+			if waitErr != nil {
+				log.Printf("[Warning] MCP server process monitoring failed: %v", waitErr)
 			} else if !state.Success() {
 				log.Printf("[Error] MCP server process exited unexpectedly with status: %v", state)
 			} else {
@@ -127,10 +140,20 @@ func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
 		inputSchemaMap = map[string]any{}
 	}
 
-	properties := inputSchemaMap["properties"]
+	var properties any
+	if p, ok := inputSchemaMap["properties"].(map[string]any); ok && p != nil {
+		properties = p
+	} else {
+		properties = map[string]any{}
+	}
+
 	var required []string
-	if r, ok := inputSchemaMap["required"].([]string); ok {
-		required = r
+	if r, ok := inputSchemaMap["required"].([]interface{}); ok {
+		for _, v := range r {
+			if s, ok := v.(string); ok {
+				required = append(required, s)
+			}
+		}
 	}
 
 	toolParam := anthropic.ToolUnionParamOfTool(
@@ -174,6 +197,8 @@ func runAgentLoop(ctx context.Context, client anthropic.Client, session *mcp.Cli
 		messages = append(messages, anthropic.NewAssistantMessage(assistantContent...))
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
+
+	log.Printf("\n=== Maximum turns reached, requesting summary ===")
 	finalMessage(ctx, client, messages)
 
 	return nil
@@ -270,27 +295,27 @@ func extractTextContent(content []mcp.Content) string {
 
 // finalMessage asks LLM to summarize what happened during session if max turns are reached
 func finalMessage(ctx context.Context, client anthropic.Client, messages []anthropic.MessageParam) {
-
-	summaryPrompt := `I've reached the maximum number of allowed turns. Please provide a summary of:\n
-	1. What you accomplished so far
-	2. What still needs to be done
-	3. Any issues or blockers encountered`
+	summaryPrompt := `I've reached the maximum number of allowed turns. Please provide a summary of:
+1. What you accomplished so far
+2. What still needs to be done
+3. Any issues or blockers encountered`
 
 	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(summaryPrompt)))
 
-	finalMessage, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+	finalMsg, err := client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     claudeModel,
 		MaxTokens: maxTokens,
 		System:    []anthropic.TextBlockParam{{Type: "text", Text: systemPrompt}},
 		Messages:  messages,
 	})
 	if err != nil {
-		log.Printf("Failed to get final summary: %v", err)
-	} else {
-		for _, block := range finalMessage.Content {
-			if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
-				fmt.Println(textBlock.Text)
-			}
+		log.Printf("failed to get final summary: %v", err)
+		return
+	}
+
+	for _, block := range finalMsg.Content {
+		if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
+			fmt.Println(textBlock.Text)
 		}
 	}
 }
