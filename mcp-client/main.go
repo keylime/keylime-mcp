@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -35,7 +37,17 @@ You have a maximum of 5 conversation turns to complete the task. When given a ta
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		log.Println("\nShutting down gracefully...")
+		cancel()
+	}()
 
 	if err := godotenv.Load("../.env"); err != nil {
 		log.Printf("Warning: .env file not loaded: %v", err)
@@ -55,11 +67,18 @@ func main() {
 		log.Fatal("Error: user query cannot be empty")
 	}
 
-	session, err := connectToMCPServer(ctx)
+	session, cmd, err := connectToMCPServer(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect to MCP server: %v", err)
 	}
 	defer session.Close()
+
+	// In main(), ensure process is killed on exit
+	defer func() {
+		if cmd != nil && cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+	}()
 
 	claudeTools, err := getMCPTools(ctx, session)
 	if err != nil {
@@ -74,14 +93,14 @@ func main() {
 }
 
 // connectToMCPServer establishes connection to the MCP server
-func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
+func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, *exec.Cmd, error) {
 	serverPath := os.Getenv("MCP_SERVER_PATH")
 	if serverPath == "" {
 		serverPath = defaultServerPath
 	}
 
 	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("server not found: %s", serverPath)
+		return nil, nil, fmt.Errorf("server not found: %s", serverPath)
 	}
 
 	client := mcp.NewClient(&mcp.Implementation{
@@ -93,7 +112,7 @@ func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
 	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %w", err)
+		return nil, nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
 	// Monitor server process for unexpected exits
@@ -114,7 +133,7 @@ func connectToMCPServer(ctx context.Context) (*mcp.ClientSession, error) {
 	}
 
 	log.Printf("Connected to MCP server: %s", serverPath)
-	return session, nil
+	return session, cmd, nil
 }
 
 // getMCPTools retrieves and converts MCP tools to Claude format
