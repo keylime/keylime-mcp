@@ -22,6 +22,10 @@ func fetchAllAgentUUIDs() ([]string, error) {
 		return nil, err
 	}
 
+	if agents.Results.UUIDs == nil {
+		return []string{}, nil
+	}
+
 	return agents.Results.UUIDs, nil
 }
 
@@ -66,6 +70,20 @@ func mapAgentToOutput(agentUUID string, agentStatus keylimeAgentStatusResponse) 
 }
 
 func mapAgentToPolicies(agentUUID string, agentStatus keylimeAgentStatusResponse) getAgentPoliciesOutput {
+	// Ensure slices are never nil
+	hashAlgs := agentStatus.Results.AcceptTPMHashAlgs
+	if hashAlgs == nil {
+		hashAlgs = []string{}
+	}
+	encAlgs := agentStatus.Results.AcceptTPMEncryptionAlgs
+	if encAlgs == nil {
+		encAlgs = []string{}
+	}
+	signAlgs := agentStatus.Results.AcceptTPMSigningAlgs
+	if signAlgs == nil {
+		signAlgs = []string{}
+	}
+
 	return getAgentPoliciesOutput{
 		AgentUUID:                 agentUUID,
 		TPMPolicy:                 parseJSONString(agentStatus.Results.TPMPolicy),
@@ -73,9 +91,9 @@ func mapAgentToPolicies(agentUUID string, agentStatus keylimeAgentStatusResponse
 		MetaData:                  parseJSONString(agentStatus.Results.MetaData),
 		HasMeasuredBootPolicy:     agentStatus.Results.HasMbRefstate != 0,
 		HasRuntimePolicy:          agentStatus.Results.HasRuntimePolicy != 0,
-		AcceptedTPMHashAlgs:       agentStatus.Results.AcceptTPMHashAlgs,
-		AcceptedTPMEncryptionAlgs: agentStatus.Results.AcceptTPMEncryptionAlgs,
-		AcceptedTPMSigningAlgs:    agentStatus.Results.AcceptTPMSigningAlgs,
+		AcceptedTPMHashAlgs:       hashAlgs,
+		AcceptedTPMEncryptionAlgs: encAlgs,
+		AcceptedTPMSigningAlgs:    signAlgs,
 	}
 }
 

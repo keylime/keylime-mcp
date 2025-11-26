@@ -45,7 +45,9 @@ func getFailedAgents(ctx context.Context, req *mcp.CallToolRequest, input getFai
 		return nil, getFailedAgentsOutput{}, err
 	}
 
-	var failedAgents getFailedAgentsOutput
+	failedAgents := getFailedAgentsOutput{
+		FailedAgents: []getAgentStatusOutput{},
+	}
 	for _, agentUUID := range uuids {
 		agentStatus, err := fetchAgentDetails(agentUUID)
 		if err != nil {
