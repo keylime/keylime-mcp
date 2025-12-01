@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Client for Keylime</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; background: #f5f5f5; }
+        .header { background: #2563eb; color: white; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .chat-container { flex: 1; overflow-y: auto; padding: 1rem; }
+        .message { margin-bottom: 1rem; padding: 0.75rem; border-radius: 8px; max-width: 80%; white-space: pre-wrap; word-wrap: break-word; }
+        .message.user { background: #2563eb; color: white; margin-left: auto; }
+        .message.assistant { background: white; border: 1px solid #e5e7eb; }
+        .message .time { font-size: 0.75rem; opacity: 0.7; margin-top: 0.25rem; }
+        .input-area { background: white; padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; gap: 0.5rem; }
+        textarea { flex: 1; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; resize: none; font-family: inherit; font-size: 1rem; }
+        button { background: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MCP Client for Keylime</h1>
+    </div>
+
+    <div class="chat-container" id="messages">
+        {{template "messages.html" .}}
+    </div>
+
+    <form hx-post="/send" hx-target="#messages" hx-swap="innerHTML" class="input-area" id="chatForm">
+        <textarea id="messageInput" name="message" placeholder="Type your message..." rows="3" required></textarea>
+        <button type="submit" id="sendBtn">Send</button>
+    </form>
+
+    <script>
+        const form = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // Auto-scroll to bottom on new messages
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            const container = document.getElementById('messages');
+            container.scrollTop = container.scrollHeight;
+
+            // Reset form after response
+            if (evt.detail.target.id === 'messages') {
+                messageInput.value = '';
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        });
+
+        // Disable button during request
+        document.body.addEventListener('htmx:beforeRequest', function() {
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+        });
+    </script>
+</body>
+</html>

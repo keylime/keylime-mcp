@@ -44,3 +44,6 @@ clean:
 
 mcp:
 	cd backend && go build -o server *.go
+
+web:
+	cd mcp-client && go run *.go --web
