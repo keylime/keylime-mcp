@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultServerPath = "../backend/server"
+	defaultServerPath = "../bin/server"
 	mcpClientName     = "mcp-client"
 	mcpClientVersion  = "v1.0.0"
 
