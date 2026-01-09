@@ -25,7 +25,7 @@ client: server
 	go build -o bin/client cmd/client/main.go
 
 run: .env server client
-	cd cmd/client && ./client
+	cd bin/ && ./client
 
 
 # TODO Podman

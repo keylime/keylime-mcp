@@ -1,0 +1,55 @@
+{{if eq .Role "user"}}
+<div class="message message-user">
+    <div class="message-avatar">U</div>
+    <div class="message-content">
+        <div class="message-role">You</div>
+        <div class="message-text">{{.Content}}</div>
+    </div>
+</div>
+{{else if eq .Role "assistant"}}
+<div class="message message-assistant">
+    <div class="message-avatar">K</div>
+    <div class="message-content">
+        <div class="message-role">Keylime Agent</div>
+        <div class="message-text">{{.Content}}</div>
+    </div>
+</div>
+{{else if eq .Role "tool-request"}}
+<div class="message message-tool">
+    <div class="message-avatar">⚡</div>
+    <div class="message-content">
+        <div class="message-role">Tool Request</div>
+        <div class="tool-request" data-tool-id="{{.ToolID}}">
+            <div class="tool-header">
+                <span class="tool-icon">🔧</span>
+                <span class="tool-name">{{.ToolName}}</span>
+                <span class="tool-label">Requires approval</span>
+            </div>
+            {{if .ToolArgs}}
+            <div class="tool-args">{{.ToolArgs}}</div>
+            {{end}}
+            <div class="tool-actions">
+                <button class="btn btn-success approve-btn">Approve</button>
+                <button class="btn btn-danger deny-btn">Deny</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{else if eq .Role "system"}}
+<div class="message message-system">
+    <div class="message-avatar">ℹ</div>
+    <div class="message-content">
+        <div class="message-role">System</div>
+        <div class="message-text">{{.Content}}</div>
+    </div>
+</div>
+{{else if eq .Role "error"}}
+<div class="message message-system">
+    <div class="message-avatar">⚠</div>
+    <div class="message-content">
+        <div class="message-role">Error</div>
+        <div class="message-text" style="color: var(--accent-red);">{{.Content}}</div>
+    </div>
+</div>
+{{end}}
+

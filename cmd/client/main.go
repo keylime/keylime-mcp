@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,12 +11,13 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/keylime/keylime-mcp/internal/agent"
+	"github.com/keylime/keylime-mcp/internal/web"
 )
 
 const (
-	defaultServerPath = "../../cmd/server/server"
+	defaultServerPath = "./server"
 	defaultPort       = "3000"
-	envFileLocation   = "../../.env"
+	envFileLocation   = "./../.env"
 )
 
 func main() {
@@ -55,18 +57,30 @@ func main() {
 		return
 	}
 
-	agent := agent.NewAgent(agent.Config{
+	agentInstance := agent.NewAgent(agent.Config{
 		APIKey:     apiKey,
 		ServerPath: serverPath,
 	})
 
-	if err := agent.Connect(ctx); err != nil {
+	if err := agentInstance.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect to MCP server: %v", err)
 	}
 	log.Printf("Connected to MCP server")
-	defer agent.Close()
+	defer agentInstance.Close()
 
-	if err := agent.GetTools(ctx); err != nil {
+	if err := agentInstance.GetTools(ctx); err != nil {
 		log.Fatalf("Failed to get MCP tools: %v", err)
+	}
+
+	srv, err := web.NewServer(agentInstance, ctx)
+	if err != nil {
+		log.Fatalf("Failed to create web server: %v", err)
+	}
+
+	addr := fmt.Sprintf(":%s", port)
+	log.Printf("Starting Keylime MCP Agent at http://localhost%s", addr)
+
+	if err := srv.Start(addr); err != nil {
+		log.Fatalf("Server error: %v", err)
 	}
 }

@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	defaultServerPath = "../bin/server"
-	mcpClientName     = "mcp-client"
-	mcpClientVersion  = "v1.0.0"
+	mcpClientName    = "mcp-client"
+	mcpClientVersion = "v1.0.0"
 
 	DefaultModel     = anthropic.ModelClaude3_5HaikuLatest
 	DefaultMaxTokens = 2048
@@ -151,7 +150,7 @@ func (a *Agent) Close() {
 	if a.mcpSession != nil {
 		a.mcpSession.Close()
 	}
-	if a.mcpCmd != nil {
+	if a.mcpCmd != nil && a.mcpCmd.Process != nil {
 		a.mcpCmd.Process.Kill()
 	}
 }
@@ -257,4 +256,15 @@ func extractTextContent(content []mcp.Content) string {
 	}
 
 	return resultText.String()
+}
+
+func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
+	a.messages = append(a.messages, anthropic.NewUserMessage(
+		anthropic.NewToolResultBlock(tool.ID, "Tool execution denied by user.", false),
+	))
+	return a.callClaude(ctx, onMessage)
+}
+
+func (a *Agent) Reset() {
+	a.messages = []anthropic.MessageParam{}
 }
