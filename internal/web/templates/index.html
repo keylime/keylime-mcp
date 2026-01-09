@@ -542,6 +542,11 @@
 
         // Connect to SSE
         function connect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
             eventSource = new EventSource('/events');
 
             eventSource.addEventListener('ping', () => {
@@ -723,7 +728,13 @@
             if (emptyState) emptyState.style.display = 'flex';
         }
 
-        // Initialize
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+
+
         connect();
     </script>
 </body>
