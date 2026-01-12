@@ -7,14 +7,10 @@ $(error Podman not found. Install: sudo dnf install podman podman-compose)
 endif
 
 help:
-	@echo "Keylime MCP (Podman)"
-	@echo "  make build  - Build containers"
-	@echo "  make up     - Start containers"
-	@echo "  make down   - Stop containers"
-	@echo "  make logs   - View logs"
-	@echo "  make ps     - List containers"
-	@echo "  make clean  - Remove all"
-	@echo "  make mcp    - Build MCP server"
+	@echo "Keylime MCP"
+	@echo "  make server  - Build MCP server binary"
+	@echo "  make client  - Build web client binary"
+	@echo "  make run     - Run web client locally"
 
 .env:
 	@if [ ! -f .env ]; then \
@@ -22,25 +18,14 @@ help:
 		echo "Created .env from .env.example"; \
 	fi
 
-build: .env
-	podman-compose -f compose.yml build
+server:
+	go build -o bin/server cmd/server/main.go
 
-up:
-	podman-compose -f compose.yml up -d
-	@echo "http://localhost:3000"
+client: server
+	go build -o bin/client cmd/client/main.go
 
-down:
-	podman-compose -f compose.yml down
+run: .env server client
+	cd bin/ && ./client
 
-logs:
-	podman-compose -f compose.yml logs -f
 
-ps:
-	podman ps -a
-
-clean:
-	podman-compose -f compose.yml down -v
-	podman system prune -f
-
-mcp:
-	cd backend && go build -o server *.go
+# TODO Podman

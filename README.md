@@ -19,7 +19,7 @@ There are two ways to use this MCP server:
 
 Build the server:
 ```bash
-make mcp
+make server
 ```
 
 You can move the binary anywhere you want (e.g., `/usr/local/bin/server).
@@ -29,7 +29,7 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
 {
   "mcpServers": {
     "keylime": {
-      "command": "/full/path/to/keylime-mcp/backend/server",
+      "command": "/full/path/to/keylime-mcp/bin/server",
       "env": {
         "KEYLIME_CERT_DIR": "/full/path/to/keylime/certs/dir"
       }
@@ -44,42 +44,19 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
 
 Restart your MCP client. Done.
 
-### Option 2: Web UI (Podman)
+### Option 2: Web UI
 
 ```bash
-make build
-make up
+make run
 ```
 Access at http://localhost:3000
 
-## Development
-
-Run locally without containers:
-
-```bash
-# Backend
-cd backend && go run *.go
-
-# Frontend
-cd frontend && pnpm dev
-```
-
 ## Commands
 
-- `make build` - Build containers
-- `make up` - Start containers
-- `make down` - Stop containers  
-- `make logs` - View logs
-- `make clean` - Remove everything
-- `make ps` - List containers
-- `make help` - Show all commands
-- `make mcp` - Build MCP server binary file
+- `make server` - Build mcp server binary
+- `make client` - Build web client binary
+- `make run` - Run web client locally 
 
-## Stack
-
-- **Backend**: Go 1.23
-- **Frontend**: React + TypeScript + Vite + Tailwind + shadcn/ui
-- **Container**: Podman
 
 ## About Keylime
 

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keylime MCP Agent</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-cyan: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-purple: #a371f7;
+            --user-bg: #1f6feb;
+            --assistant-bg: #21262d;
+            --tool-bg: #161b22;
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .logo-text {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+
+        .logo-text span {
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: var(--border-color);
+            border-color: var(--text-muted);
+        }
+
+        .btn-primary {
+            background: var(--user-bg);
+            border-color: var(--user-bg);
+        }
+
+        .btn-primary:hover {
+            background: #388bfd;
+            border-color: #388bfd;
+        }
+
+        .btn-success {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            color: #000;
+        }
+
+        .btn-success:hover {
+            background: #2ea043;
+            border-color: #2ea043;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .btn-danger:hover {
+            background: var(--accent-red);
+            color: #fff;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Messages */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .message-user .message-avatar {
+            background: var(--user-bg);
+        }
+
+        .message-assistant .message-avatar {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+        }
+
+        .message-tool .message-avatar {
+            background: var(--accent-orange);
+            color: #000;
+        }
+
+        .message-system .message-avatar {
+            background: var(--text-muted);
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-role {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+
+        .message-text {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            line-height: 1.6;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .message-user .message-text {
+            background: var(--user-bg);
+            border-color: var(--user-bg);
+        }
+
+        /* Tool Request */
+        .tool-request {
+            background: var(--tool-bg);
+            border: 1px solid var(--accent-orange);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .tool-header {
+            background: rgba(210, 153, 34, 0.1);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tool-icon {
+            font-size: 16px;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: var(--accent-orange);
+            font-size: 14px;
+        }
+
+        .tool-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .tool-args {
+            padding: 12px 16px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .tool-actions {
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .tool-result {
+            margin-top: 8px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            color: var(--accent-green);
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid var(--border-color);
+        }
+
+        .tool-result.error {
+            color: var(--accent-red);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px 0 24px;
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 8px;
+            transition: border-color 0.15s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--accent-cyan);
+        }
+
+        .input-field {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 8px 12px;
+            resize: none;
+            font-family: inherit;
+            line-height: 1.5;
+            min-height: 24px;
+            max-height: 200px;
+        }
+
+        .input-field:focus {
+            outline: none;
+        }
+
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            background: var(--user-bg);
+            border: none;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background: #388bfd;
+        }
+
+        .send-btn:disabled {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+        }
+
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Status indicator */
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+        }
+
+        .status-dot.disconnected {
+            background: var(--accent-red);
+        }
+
+        .status-dot.pending {
+            background: var(--accent-orange);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Loading spinner */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 8px 0;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 48px;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            max-width: 400px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">K</div>
+            <div class="logo-text">Keylime <span>MCP Agent</span></div>
+        </div>
+        <div class="header-actions">
+            <button class="btn" id="reset-btn">New Chat</button>
+        </div>
+    </header>
+
+    <div class="chat-container">
+        <div class="messages" id="messages">
+            <div class="empty-state" id="empty-state">
+                <div class="empty-icon">🔐</div>
+                <div class="empty-title">Keylime MCP Agent</div>
+                <div class="empty-text">
+                    Ask me about your Keylime infrastructure. I can help you monitor agents, 
+                    check attestation status, investigate failures, and manage your TPM-based security.
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <form id="chat-form">
+                <div class="input-container">
+                    <textarea 
+                        class="input-field" 
+                        id="message-input" 
+                        placeholder="Ask about your Keylime agents..."
+                        rows="1"
+                    ></textarea>
+                    <button type="submit" class="send-btn" id="send-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+            <div class="status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messagesEl = document.getElementById('messages');
+        const emptyState = document.getElementById('empty-state');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        let eventSource = null;
+        let isProcessing = false;
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+        });
+
+        // Handle Enter key (Shift+Enter for new line)
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Connect to SSE
+        function connect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            eventSource = new EventSource('/events');
+
+            eventSource.addEventListener('ping', () => {
+                setStatus('connected', 'Connected');
+            });
+
+            eventSource.addEventListener('user-message', (e) => {
+                hideEmptyState();
+                appendHTML(e.data);
+                scrollToBottom();
+            });
+
+            eventSource.addEventListener('assistant-message', (e) => {
+                hideLoading();
+                appendHTML(e.data);
+                scrollToBottom();
+                setProcessing(false);
+            });
+
+            eventSource.addEventListener('tool-request', (e) => {
+                hideLoading();
+                appendHTML(e.data);
+                scrollToBottom();
+                setStatus('pending', 'Waiting for approval...');
+            });
+
+            eventSource.addEventListener('tool-executing', (e) => {
+                const toolId = e.data;
+                const toolEl = document.querySelector(`[data-tool-id="${toolId}"]`);
+                if (toolEl) {
+                    const actions = toolEl.querySelector('.tool-actions');
+                    if (actions) {
+                        actions.innerHTML = '<div class="loading"><div class="spinner"></div>Executing...</div>';
+                    }
+                }
+                setStatus('pending', 'Executing tool...');
+            });
+
+            eventSource.addEventListener('tool-result', (e) => {
+                const wrapper = document.createElement('div');
+                // Unescape newlines from SSE
+                wrapper.innerHTML = e.data.replace(/\\n/g, '\n');
+                const resultEl = wrapper.firstElementChild;
+                const toolId = resultEl.dataset.toolId;
+                
+                const toolEl = document.querySelector(`[data-tool-id="${toolId}"]`);
+                if (toolEl) {
+                    const actions = toolEl.querySelector('.tool-actions');
+                    if (actions) actions.remove();
+                    toolEl.appendChild(resultEl);
+                }
+                
+                scrollToBottom();
+                setStatus('connected', 'Connected');
+                showLoading();
+            });
+
+            eventSource.addEventListener('tool-denied', (e) => {
+                appendHTML(e.data);
+                scrollToBottom();
+                setProcessing(false);
+                setStatus('connected', 'Connected');
+                showLoading();
+            });
+
+            eventSource.addEventListener('error', (e) => {
+                hideLoading();
+                appendHTML(e.data);
+                scrollToBottom();
+                setProcessing(false);
+            });
+
+            eventSource.addEventListener('reset', () => {
+                messagesEl.innerHTML = '';
+                showEmptyState();
+                setProcessing(false);
+                setStatus('connected', 'Connected');
+            });
+
+            eventSource.onerror = () => {
+                setStatus('disconnected', 'Disconnected');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        // Send message
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message || isProcessing) return;
+
+            setProcessing(true);
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            try {
+                const formData = new FormData();
+                formData.append('message', message);
+                await fetch('/chat', { method: 'POST', body: formData });
+                showLoading();
+            } catch (err) {
+                setProcessing(false);
+                console.error('Failed to send message:', err);
+            }
+        });
+
+        // Reset chat
+        resetBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/reset', { method: 'POST' });
+            } catch (err) {
+                console.error('Failed to reset:', err);
+            }
+        });
+
+        // Tool approval handlers (delegated)
+        messagesEl.addEventListener('click', async (e) => {
+            if (e.target.matches('.approve-btn')) {
+                try {
+                    await fetch('/tool/approve', { method: 'POST' });
+                } catch (err) {
+                    console.error('Failed to approve:', err);
+                }
+            } else if (e.target.matches('.deny-btn')) {
+                try {
+                    await fetch('/tool/deny', { method: 'POST' });
+                } catch (err) {
+                    console.error('Failed to deny:', err);
+                }
+            }
+        });
+
+        // Helpers
+        function appendHTML(html) {
+            // Unescape newlines from SSE
+            html = html.replace(/\\n/g, '\n');
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            while (wrapper.firstChild) {
+                messagesEl.appendChild(wrapper.firstChild);
+            }
+        }
+
+        function scrollToBottom() {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function setStatus(state, text) {
+            statusDot.className = 'status-dot ' + (state === 'connected' ? '' : state);
+            statusText.textContent = text;
+        }
+
+        function setProcessing(processing) {
+            isProcessing = processing;
+            sendBtn.disabled = processing;
+        }
+
+        function showLoading() {
+            if (!document.getElementById('loading-indicator')) {
+                const loading = document.createElement('div');
+                loading.id = 'loading-indicator';
+                loading.className = 'loading';
+                loading.innerHTML = '<div class="spinner"></div>Thinking...';
+                messagesEl.appendChild(loading);
+                scrollToBottom();
+            }
+        }
+
+        function hideLoading() {
+            const loading = document.getElementById('loading-indicator');
+            if (loading) loading.remove();
+        }
+
+        function hideEmptyState() {
+            if (emptyState) emptyState.style.display = 'none';
+        }
+
+        function showEmptyState() {
+            if (emptyState) emptyState.style.display = 'flex';
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+
+
+        connect();
+    </script>
+</body>
+</html>
+
