@@ -157,7 +157,7 @@ func (a *Agent) Close() {
 
 func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage func(Message)) error {
 	a.messages = append(a.messages, anthropic.NewUserMessage(anthropic.NewTextBlock(userMessage)))
-	// TODO: add maximun turns and add support for gemini
+	// TODO: add maximum turns and add support for gemini
 	return a.callClaude(ctx, onMessage)
 }
 
