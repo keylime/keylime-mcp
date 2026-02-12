@@ -38,7 +38,8 @@ func main() {
 
 	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
 	if apiKey == "" {
-		log.Fatal("ANTHROPIC_API_KEY environment variable not set")
+		log.Println("ANTHROPIC_API_KEY environment variable not set")
+		return
 	}
 
 	serverPath := os.Getenv("MCP_SERVER_PATH")
@@ -63,24 +64,28 @@ func main() {
 	})
 
 	if err := agentInstance.Connect(ctx); err != nil {
-		log.Fatalf("Failed to connect to MCP server: %v", err)
+		log.Printf("Failed to connect to MCP server: %v", err)
+		return
 	}
 	log.Printf("Connected to MCP server")
 	defer agentInstance.Close()
 
 	if err := agentInstance.GetTools(ctx); err != nil {
-		log.Fatalf("Failed to get MCP tools: %v", err)
+		log.Printf("Failed to get MCP tools: %v", err)
+		return
 	}
 
-	srv, err := web.NewServer(agentInstance, ctx)
+	srv, err := web.NewServer(ctx, agentInstance)
 	if err != nil {
-		log.Fatalf("Failed to create web server: %v", err)
+		log.Printf("Failed to create web server: %v", err)
+		return
 	}
 
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("Starting Keylime MCP Agent at http://localhost%s", addr)
 
 	if err := srv.Start(addr); err != nil {
-		log.Fatalf("Server error: %v", err)
+		log.Printf("Server error: %v", err)
+		return
 	}
 }

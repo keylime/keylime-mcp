@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"os/exec"
 	"strings"
 
@@ -88,7 +89,7 @@ func (a *Agent) Connect(ctx context.Context) error {
 		Name:    mcpClientName,
 		Version: mcpClientVersion,
 	}, nil)
-	cmd := exec.Command(a.config.ServerPath)
+	cmd := exec.Command(a.config.ServerPath) //nolint:gosec // G204: ServerPath is from trusted config, not user input
 	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
@@ -151,7 +152,9 @@ func (a *Agent) Close() {
 		a.mcpSession.Close()
 	}
 	if a.mcpCmd != nil && a.mcpCmd.Process != nil {
-		a.mcpCmd.Process.Kill()
+		if err := a.mcpCmd.Process.Kill(); err != nil {
+			log.Printf("Warning: failed to kill MCP process: %v", err)
+		}
 	}
 }
 
@@ -223,13 +226,14 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 	var resultText string
 	var isError bool
 
-	if err != nil {
+	switch {
+	case err != nil:
 		resultText = fmt.Sprintf("Error: %v", err)
 		isError = true
-	} else if result.IsError {
+	case result.IsError:
 		resultText = fmt.Sprintf("Tool '%s' execution failed: %s", toolRequest.Name, extractTextContent(result.Content))
 		isError = true
-	} else {
+	default:
 		resultText = extractTextContent(result.Content)
 	}
 

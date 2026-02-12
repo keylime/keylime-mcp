@@ -30,7 +30,6 @@ func main() {
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}
-
 }
 
 func loadConfig() keylime.Config {

@@ -52,7 +52,7 @@ type Config struct {
 	Port       string
 }
 
-type KeylimeClient struct {
+type Client struct {
 	baseURL    string
 	apiVersion string
 	httpClient *http.Client
@@ -64,7 +64,7 @@ type GetAllAgentsOutput struct {
 	Agents []string `json:"agents"`
 }
 
-type KeylimeAgentListResponse struct {
+type AgentListResponse struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Results struct {
@@ -72,7 +72,7 @@ type KeylimeAgentListResponse struct {
 	} `json:"results"`
 }
 
-type KeylimeAgentStatusResponse struct {
+type AgentStatusResponse struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Results struct {
