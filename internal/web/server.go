@@ -97,7 +97,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[CHAT] User message: %s", message)
+	log.Printf("[CHAT] User message: %s", sanitizeLog(message))
 
 	s.send(SSEvent{
 		Event: "user-message",
@@ -306,4 +306,10 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "..."
+}
+
+func sanitizeLog(s string) string {
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	return s
 }

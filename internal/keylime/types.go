@@ -47,7 +47,7 @@ type Config struct {
 
 	APIVersion string
 	ClientCert string
-	ClientKey  string
+	ClientKey  string // #nosec G117 -- field name for cert key path, value is not hardcoded
 	CAPath     string
 	Port       string
 }

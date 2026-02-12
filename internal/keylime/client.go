@@ -51,7 +51,7 @@ func createTLSConfig(config *Config) *tls.Config {
 		log.Printf("Attempting to connect without client cert (may fail with mTLS servers)")
 		// Return basic TLS config without client cert
 		return &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // G402: fallback when client cert fails, intentional for Keylime
+			InsecureSkipVerify: true, // #nosec G402 -- fallback when client cert fails, intentional for Keylime
 		}
 	}
 
@@ -75,7 +75,7 @@ func createTLSConfig(config *Config) *tls.Config {
 		RootCAs:      caCertPool,
 		// Ignore hostname verification (like Python's HostNameIgnoreAdapter)
 		// This is needed because Keylime certs often don't have correct hostname
-		InsecureSkipVerify: config.IgnoreHostname, //nolint:gosec // G402: Keylime certs often lack correct hostname
+		InsecureSkipVerify: config.IgnoreHostname, // #nosec G402 -- Keylime certs often lack correct hostname
 	}
 
 	return tlsConfig
@@ -83,7 +83,7 @@ func createTLSConfig(config *Config) *tls.Config {
 
 func (kc *Client) Get(endpoint string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
-	return kc.httpClient.Get(url)
+	return kc.httpClient.Get(url) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
 func (kc *Client) doRequestWithBody(method, endpoint string, body interface{}) (*http.Response, error) {
@@ -99,7 +99,7 @@ func (kc *Client) doRequestWithBody(method, endpoint string, body interface{}) (
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	return kc.httpClient.Do(req)
+	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
 func (kc *Client) Post(endpoint string, body interface{}) (*http.Response, error) {
@@ -116,5 +116,5 @@ func (kc *Client) Delete(endpoint string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return kc.httpClient.Do(req)
+	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }

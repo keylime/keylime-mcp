@@ -52,7 +52,7 @@ func main() {
 		port = defaultPort
 	}
 
-	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
+	if _, err := os.Stat(serverPath); os.IsNotExist(err) { // #nosec G703 -- serverPath from env/default, not user input
 		log.Printf("Warning: MCP server not found at %s", serverPath)
 		log.Printf("Build the server first: go build -o bin/server cmd/server/main.go")
 		return

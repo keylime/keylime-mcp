@@ -32,7 +32,7 @@ You have a maximum of 5 conversation turns to complete the task. When given a ta
 )
 
 type Config struct {
-	APIKey       string
+	APIKey       string // #nosec G117 -- field name for API key config, value is not hardcoded
 	ServerPath   string
 	Model        anthropic.Model
 	MaxTokens    int64
@@ -89,7 +89,7 @@ func (a *Agent) Connect(ctx context.Context) error {
 		Name:    mcpClientName,
 		Version: mcpClientVersion,
 	}, nil)
-	cmd := exec.Command(a.config.ServerPath) //nolint:gosec // G204: ServerPath is from trusted config, not user input
+	cmd := exec.Command(a.config.ServerPath) // #nosec G204 -- ServerPath is from trusted config, not user input
 	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
@@ -149,7 +149,9 @@ func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
 
 func (a *Agent) Close() {
 	if a.mcpSession != nil {
-		a.mcpSession.Close()
+		if err := a.mcpSession.Close(); err != nil {
+			log.Printf("Warning: failed to close MCP session: %v", err)
+		}
 	}
 	if a.mcpCmd != nil && a.mcpCmd.Process != nil {
 		if err := a.mcpCmd.Process.Kill(); err != nil {
