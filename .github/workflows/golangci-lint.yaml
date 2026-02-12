@@ -32,13 +32,18 @@ jobs:
       - name: Install Go
         run: dnf -y install golang
 
+      - name: Show Go version
+        run: go version
+
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
       - name: Run golangci-lint
-        run: golangci-lint -v run --timeout 5m ./...
+        run: golangci-lint -v run ./...
 
     container:
       image: ${{matrix.os}}
       env:
         DISTRO: ${{matrix.os}}
+        GOPATH: /root/go
+        PATH: /root/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

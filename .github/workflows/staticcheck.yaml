@@ -42,3 +42,5 @@ jobs:
       image: ${{matrix.os}}
       env:
         DISTRO: ${{matrix.os}}
+        GOPATH: /root/go
+        PATH: /root/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
