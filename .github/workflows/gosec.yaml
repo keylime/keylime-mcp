@@ -1,0 +1,44 @@
+---
+name: gosec
+
+"on":
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+
+jobs:
+  gosec:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ ! matrix.stable }}
+    strategy:
+      matrix:
+        os:
+          - fedora:latest
+        stable: [true]
+        include:
+          - os: quay.io/fedora/fedora:rawhide
+            stable: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show OS information
+        run: cat /etc/os-release
+
+      - name: Install Go
+        run: dnf -y install golang
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec
+        run: gosec ./...
+
+    container:
+      image: ${{matrix.os}}
+      env:
+        DISTRO: ${{matrix.os}}

@@ -1,0 +1,44 @@
+---
+name: staticcheck
+
+"on":
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+
+jobs:
+  staticcheck:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ ! matrix.stable }}
+    strategy:
+      matrix:
+        os:
+          - fedora:latest
+        stable: [true]
+        include:
+          - os: quay.io/fedora/fedora:rawhide
+            stable: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show OS information
+        run: cat /etc/os-release
+
+      - name: Install Go
+        run: dnf -y install golang
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run staticcheck
+        run: staticcheck ./...
+
+    container:
+      image: ${{matrix.os}}
+      env:
+        DISTRO: ${{matrix.os}}
