@@ -14,15 +14,6 @@ name: staticcheck
 jobs:
   staticcheck:
     runs-on: ubuntu-latest
-    continue-on-error: ${{ ! matrix.stable }}
-    strategy:
-      matrix:
-        os:
-          - fedora:latest
-        stable: [true]
-        include:
-          - os: quay.io/fedora/fedora:rawhide
-            stable: false
     steps:
       - uses: actions/checkout@v5
 
@@ -39,8 +30,7 @@ jobs:
         run: staticcheck ./...
 
     container:
-      image: ${{matrix.os}}
+      image: fedora:latest
       env:
-        DISTRO: ${{matrix.os}}
         GOPATH: /root/go
         PATH: /root/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
