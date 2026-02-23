@@ -16,7 +16,7 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	DefaultModel     = anthropic.ModelClaude3_5HaikuLatest
+	DefaultModel     = anthropic.ModelClaudeHaiku4_5
 	DefaultMaxTokens = 2048
 	DefaultMaxTurns  = 5
 
