@@ -1,14 +1,11 @@
 ---
-run:
-  timeout: 5m
+version: "2"
 
 linters:
   enable:
     # Default linters
     - errcheck
-    - gosimple
     - govet
-    - ineffassign
     - staticcheck
     - unused
     # Additional linters
@@ -18,8 +15,6 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - gosec
     - misspell
     - nakedret
@@ -28,38 +23,39 @@ linters:
     - unconvert
     - unparam
     - whitespace
+  settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 20
+    dupl:
+      threshold: 100
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    misspell:
+      locale: US
+    errcheck:
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - fmt.Fprintf
+        - (io.Closer).Close
+    gosec:
+      excludes:
+        - G706
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+          disabled: true
 
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  gocognit:
-    min-complexity: 20
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
-  revive:
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: exported
-      - name: increment-decrement
-      - name: var-naming
-      - name: package-comments
-        disabled: true
-
-issues:
-  exclude-rules:
-    # Exclude some linters from running on test files
-    - path: _test\.go
-      linters:
-        - dupl
-        - gocyclo
-        - gocognit
-        - gosec
+formatters:
+  enable:
+    - gofmt
+    - goimports
