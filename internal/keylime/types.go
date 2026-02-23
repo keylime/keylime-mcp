@@ -47,12 +47,12 @@ type Config struct {
 
 	APIVersion string
 	ClientCert string
-	ClientKey  string
+	ClientKey  string // #nosec G117 -- field name for cert key path, value is not hardcoded
 	CAPath     string
 	Port       string
 }
 
-type KeylimeClient struct {
+type Client struct {
 	baseURL    string
 	apiVersion string
 	httpClient *http.Client
@@ -64,7 +64,7 @@ type GetAllAgentsOutput struct {
 	Agents []string `json:"agents"`
 }
 
-type KeylimeAgentListResponse struct {
+type AgentListResponse struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Results struct {
@@ -72,7 +72,7 @@ type KeylimeAgentListResponse struct {
 	} `json:"results"`
 }
 
-type KeylimeAgentStatusResponse struct {
+type AgentStatusResponse struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Results struct {

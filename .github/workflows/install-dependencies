@@ -229,7 +229,6 @@ case "${DISTRO}" in
         texlive-graphicxpsd \
         texlive-ae \
         texlive-colourchange \
-        texlive-colourchange-doc \
         texlive-todonotes \
         texlive-babel-english \
         texlive-tocbibind \

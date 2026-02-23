@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// newKeylimeClient creates HTTP client for Keylime API with mTLS support
-func newKeylimeClient(baseURL string, config *Config) *KeylimeClient {
+// newClient creates HTTP client for Keylime API with mTLS support
+func newClient(baseURL string, config *Config) *Client {
 	// Remove "http(s)://" prefix if present
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
@@ -34,7 +34,7 @@ func newKeylimeClient(baseURL string, config *Config) *KeylimeClient {
 		httpClient = &http.Client{}
 	}
 
-	return &KeylimeClient{
+	return &Client{
 		baseURL:    finalURL,
 		apiVersion: config.APIVersion,
 		httpClient: httpClient,
@@ -51,7 +51,7 @@ func createTLSConfig(config *Config) *tls.Config {
 		log.Printf("Attempting to connect without client cert (may fail with mTLS servers)")
 		// Return basic TLS config without client cert
 		return &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, // #nosec G402 -- fallback when client cert fails, intentional for Keylime
 		}
 	}
 
@@ -75,34 +75,18 @@ func createTLSConfig(config *Config) *tls.Config {
 		RootCAs:      caCertPool,
 		// Ignore hostname verification (like Python's HostNameIgnoreAdapter)
 		// This is needed because Keylime certs often don't have correct hostname
-		InsecureSkipVerify: config.IgnoreHostname,
+		InsecureSkipVerify: config.IgnoreHostname, // #nosec G402 -- Keylime certs often lack correct hostname
 	}
 
 	return tlsConfig
 }
 
-func (kc *KeylimeClient) Get(endpoint string) (*http.Response, error) {
+func (kc *Client) Get(endpoint string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
-	return kc.httpClient.Get(url)
+	return kc.httpClient.Get(url) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *KeylimeClient) Post(endpoint string, body interface{}) (*http.Response, error) {
-	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
-	var buf bytes.Buffer
-	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			return nil, fmt.Errorf("failed to marshal body: %w", err)
-		}
-	}
-	req, err := http.NewRequest("POST", url, &buf)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	return kc.httpClient.Do(req)
-}
-
-func (kc *KeylimeClient) Put(endpoint string, body interface{}) (*http.Response, error) {
+func (kc *Client) doRequestWithBody(method, endpoint string, body interface{}) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
 	var buf bytes.Buffer
 	if body != nil {
@@ -110,19 +94,27 @@ func (kc *KeylimeClient) Put(endpoint string, body interface{}) (*http.Response,
 			return nil, fmt.Errorf("failed to marshal body: %w", err)
 		}
 	}
-	req, err := http.NewRequest("PUT", url, &buf)
+	req, err := http.NewRequest(method, url, &buf)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	return kc.httpClient.Do(req)
+	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *KeylimeClient) Delete(endpoint string) (*http.Response, error) {
+func (kc *Client) Post(endpoint string, body interface{}) (*http.Response, error) {
+	return kc.doRequestWithBody("POST", endpoint, body)
+}
+
+func (kc *Client) Put(endpoint string, body interface{}) (*http.Response, error) {
+	return kc.doRequestWithBody("PUT", endpoint, body)
+}
+
+func (kc *Client) Delete(endpoint string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	return kc.httpClient.Do(req)
+	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }

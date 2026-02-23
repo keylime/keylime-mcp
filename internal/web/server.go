@@ -34,7 +34,7 @@ type SSEvent struct {
 }
 
 // NewServer creates a new web server instance
-func NewServer(ag *agent.Agent, ctx context.Context) (*Server, error) {
+func NewServer(ctx context.Context, ag *agent.Agent) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
@@ -60,8 +60,9 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("POST /reset", s.handleReset)
 
 	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
@@ -69,7 +70,9 @@ func (s *Server) Start(addr string) error {
 		log.Printf("[SERVER] Shutting down...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		server.Shutdown(shutdownCtx)
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Warning: server shutdown error: %v", err)
+		}
 	}()
 
 	log.Printf("Starting web server on %s", addr)
@@ -94,7 +97,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[CHAT] User message: %s", message)
+	log.Printf("[CHAT] User message: %s", sanitizeLog(message))
 
 	s.send(SSEvent{
 		Event: "user-message",
@@ -303,4 +306,10 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "..."
+}
+
+func sanitizeLog(s string) string {
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	return s
 }

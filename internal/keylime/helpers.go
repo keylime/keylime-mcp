@@ -8,15 +8,15 @@ import (
 
 // Service handles Keylime operations with verifier and registrar clients
 type Service struct {
-	Verifier  *KeylimeClient
-	Registrar *KeylimeClient
+	Verifier  *Client
+	Registrar *Client
 }
 
 // NewService creates a new Keylime service with configured clients
 func NewService(config *Config) *Service {
 	return &Service{
-		Verifier:  newKeylimeClient(config.VerifierURL, config),
-		Registrar: newKeylimeClient(config.RegistrarURL, config),
+		Verifier:  newClient(config.VerifierURL, config),
+		Registrar: newClient(config.RegistrarURL, config),
 	}
 }
 
@@ -29,7 +29,7 @@ func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	var agents KeylimeAgentListResponse
+	var agents AgentListResponse
 	err = json.NewDecoder(resp.Body).Decode(&agents)
 	if err != nil {
 		log.Printf("Error decoding agents: %v", err)
@@ -44,26 +44,26 @@ func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
 }
 
 // FetchAgentDetails retrieves detailed status information for a specific agent
-func (s *Service) FetchAgentDetails(agentUUID string) (KeylimeAgentStatusResponse, error) {
+func (s *Service) FetchAgentDetails(agentUUID string) (AgentStatusResponse, error) {
 	resp, err := s.Verifier.Get(fmt.Sprintf("agents/%s", agentUUID))
 	if err != nil {
 		log.Printf("Error fetching agent status: %v", err)
-		return KeylimeAgentStatusResponse{}, err
+		return AgentStatusResponse{}, err
 	}
 	defer resp.Body.Close()
 
-	var agentStatus KeylimeAgentStatusResponse
+	var agentStatus AgentStatusResponse
 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
 	if err != nil {
 		log.Printf("Error decoding agent status: %v", err)
-		return KeylimeAgentStatusResponse{}, err
+		return AgentStatusResponse{}, err
 	}
 
 	return agentStatus, nil
 }
 
 // MapAgentToOutput converts API response to standardized output format
-func MapAgentToOutput(agentUUID string, agentStatus KeylimeAgentStatusResponse) GetAgentStatusOutput {
+func MapAgentToOutput(agentUUID string, agentStatus AgentStatusResponse) GetAgentStatusOutput {
 	return GetAgentStatusOutput{
 		AgentUUID:                   agentUUID,
 		OperationalState:            agentStatus.Results.OperationalState,
@@ -83,7 +83,7 @@ func MapAgentToOutput(agentUUID string, agentStatus KeylimeAgentStatusResponse) 
 	}
 }
 
-func MapAgentToPolicies(agentUUID string, agentStatus KeylimeAgentStatusResponse) GetAgentPoliciesOutput {
+func MapAgentToPolicies(agentUUID string, agentStatus AgentStatusResponse) GetAgentPoliciesOutput {
 	// Ensure slices are never nil
 	hashAlgs := agentStatus.Results.AcceptTPMHashAlgs
 	if hashAlgs == nil {

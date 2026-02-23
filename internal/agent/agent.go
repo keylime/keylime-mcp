@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"os/exec"
 	"strings"
 
@@ -31,7 +32,7 @@ You have a maximum of 5 conversation turns to complete the task. When given a ta
 )
 
 type Config struct {
-	APIKey       string
+	APIKey       string // #nosec G117 -- field name for API key config, value is not hardcoded
 	ServerPath   string
 	Model        anthropic.Model
 	MaxTokens    int64
@@ -88,7 +89,7 @@ func (a *Agent) Connect(ctx context.Context) error {
 		Name:    mcpClientName,
 		Version: mcpClientVersion,
 	}, nil)
-	cmd := exec.Command(a.config.ServerPath)
+	cmd := exec.Command(a.config.ServerPath) // #nosec G204 -- ServerPath is from trusted config, not user input
 	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
@@ -148,10 +149,14 @@ func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
 
 func (a *Agent) Close() {
 	if a.mcpSession != nil {
-		a.mcpSession.Close()
+		if err := a.mcpSession.Close(); err != nil {
+			log.Printf("Warning: failed to close MCP session: %v", err)
+		}
 	}
 	if a.mcpCmd != nil && a.mcpCmd.Process != nil {
-		a.mcpCmd.Process.Kill()
+		if err := a.mcpCmd.Process.Kill(); err != nil {
+			log.Printf("Warning: failed to kill MCP process: %v", err)
+		}
 	}
 }
 
@@ -223,13 +228,14 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 	var resultText string
 	var isError bool
 
-	if err != nil {
+	switch {
+	case err != nil:
 		resultText = fmt.Sprintf("Error: %v", err)
 		isError = true
-	} else if result.IsError {
+	case result.IsError:
 		resultText = fmt.Sprintf("Tool '%s' execution failed: %s", toolRequest.Name, extractTextContent(result.Content))
 		isError = true
-	} else {
+	default:
 		resultText = extractTextContent(result.Content)
 	}
 
