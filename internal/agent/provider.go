@@ -1,0 +1,28 @@
+package agent
+
+import (
+	"context"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// LLMProvider defines the interface for LLM backends (Adapter pattern).
+// Each provider converts generic Messages and MCP tools into its native format.
+type LLMProvider interface {
+	Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error)
+}
+
+// ChatOptions contains all parameters needed for an LLM API call.
+type ChatOptions struct {
+	SystemPrompt string
+	Messages     []Message
+	Tools        []*mcp.Tool
+	MaxTokens    int64
+	Model        string
+}
+
+// LLMResponse contains the parsed response from an LLM provider.
+type LLMResponse struct {
+	TextBlocks []string
+	ToolUses   []ToolRequest
+}
