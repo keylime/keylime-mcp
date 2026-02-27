@@ -20,11 +20,10 @@ var templatesFS embed.FS
 
 // Server represents the web server for the chat interface
 type Server struct {
-	agent       *agent.Agent
-	templates   *template.Template
-	eventChan   chan SSEvent
-	pendingTool *agent.ToolRequest
-	ctx         context.Context
+	agent     *agent.Agent
+	templates *template.Template
+	eventChan chan SSEvent
+	ctx       context.Context
 }
 
 // SSEvent represents a Server-Sent Event
@@ -97,8 +96,6 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[CHAT] User message: %s", sanitizeLog(message))
-
 	s.send(SSEvent{
 		Event: "user-message",
 		Data:  s.renderMessage("user", message, "", nil),
@@ -139,7 +136,6 @@ func (s *Server) handleMessage(msg agent.Message) {
 		if len(msg.ToolCalls) > 0 {
 			tc := msg.ToolCalls[0]
 			log.Printf("[AGENT] Tool request: %s", tc.Name)
-			s.pendingTool = &tc
 			s.send(SSEvent{
 				Event: "tool-request",
 				Data:  s.renderMessage("tool-request", "", tc.ID, &tc),
@@ -157,21 +153,18 @@ func (s *Server) handleMessage(msg agent.Message) {
 }
 
 func (s *Server) handleToolApprove(w http.ResponseWriter, r *http.Request) {
-	if s.pendingTool == nil {
+	tool := s.agent.GetCurrentTool()
+	if tool == nil {
 		http.Error(w, "No pending tool request", http.StatusBadRequest)
 		return
 	}
-
-	log.Printf("[TOOL] Approved: %s", s.pendingTool.Name)
-	go s.executeTool(s.pendingTool)
-	s.pendingTool = nil
+	go s.executeTool(tool)
 
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleToolDeny(w http.ResponseWriter, r *http.Request) {
-	tool := s.pendingTool
-	s.pendingTool = nil
+	tool := s.agent.GetCurrentTool()
 	if tool == nil {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -216,7 +209,6 @@ func (s *Server) executeTool(tool *agent.ToolRequest) {
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[CHAT] Reset conversation")
 	s.agent.Reset()
-	s.pendingTool = nil
 
 	s.send(SSEvent{
 		Event: "reset",
@@ -302,10 +294,4 @@ func (s *Server) renderToolResult(toolID, content string) string {
 	}
 
 	return buf.String()
-}
-
-func sanitizeLog(s string) string {
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\r", "\\r")
-	return s
 }

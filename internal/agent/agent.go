@@ -179,6 +179,13 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 	return a.advanceToolQueue(ctx, onMessage)
 }
 
+func (a *Agent) GetCurrentTool() *ToolRequest {
+	if len(a.toolQueue) == 0 {
+		return nil
+	}
+	return &a.toolQueue[0]
+}
+
 func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
 	a.messages = append(a.messages, Message{
 		Role: RoleTool,
