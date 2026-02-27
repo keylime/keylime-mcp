@@ -36,12 +36,6 @@ func main() {
 		log.Printf("Warning: .env file not loaded: %v", err)
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
-	if apiKey == "" {
-		log.Println("ANTHROPIC_API_KEY environment variable not set")
-		return
-	}
-
 	serverPath := os.Getenv("MCP_SERVER_PATH")
 	if serverPath == "" {
 		serverPath = defaultServerPath
@@ -52,16 +46,22 @@ func main() {
 		port = defaultPort
 	}
 
+	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+	if apiKey == "" {
+		log.Println("ANTHROPIC_API_KEY environment variable not set")
+		return
+	}
+
 	if _, err := os.Stat(serverPath); os.IsNotExist(err) { // #nosec G703 -- serverPath from env/default, not user input
 		log.Printf("Warning: MCP server not found at %s", serverPath)
 		log.Printf("Build the server first: go build -o bin/server cmd/server/main.go")
 		return
 	}
 
+	provider := agent.NewClaudeProvider(apiKey)
 	agentInstance := agent.NewAgent(agent.Config{
-		APIKey:     apiKey,
 		ServerPath: serverPath,
-	})
+	}, provider)
 
 	if err := agentInstance.Connect(ctx); err != nil {
 		log.Printf("Failed to connect to MCP server: %v", err)

@@ -129,27 +129,30 @@ func (s *Server) handleMessage(msg agent.Message) {
 	log.Printf("[AGENT] Callback: role=%s", msg.Role)
 
 	switch msg.Role {
-	case "tool_result":
-		log.Printf("[TOOL] Result: %s", truncate(msg.Content, 100))
-		s.send(SSEvent{
-			Event: "tool-result",
-			Data:  s.renderToolResult(msg.ToolID, msg.Content),
-		})
+	case agent.RoleAssistant:
+		if msg.Text != "" {
+			s.send(SSEvent{
+				Event: "assistant-message",
+				Data:  s.renderMessage("assistant", msg.Text, "", nil),
+			})
+		}
+		if len(msg.ToolCalls) > 0 {
+			tc := msg.ToolCalls[0]
+			log.Printf("[AGENT] Tool request: %s", tc.Name)
+			s.pendingTool = &tc
+			s.send(SSEvent{
+				Event: "tool-request",
+				Data:  s.renderMessage("tool-request", "", tc.ID, &tc),
+			})
+		}
 
-	case "assistant":
-		log.Printf("[AGENT] Assistant response: %s", truncate(msg.Content, 100))
-		s.send(SSEvent{
-			Event: "assistant-message",
-			Data:  s.renderMessage("assistant", msg.Content, "", nil),
-		})
-
-	case "tool_request":
-		log.Printf("[AGENT] Tool request: %s", msg.Tool.Name)
-		s.pendingTool = msg.Tool
-		s.send(SSEvent{
-			Event: "tool-request",
-			Data:  s.renderMessage("tool-request", "", msg.ToolID, msg.Tool),
-		})
+	case agent.RoleTool:
+		if msg.ToolResult != nil {
+			s.send(SSEvent{
+				Event: "tool-result",
+				Data:  s.renderToolResult(msg.ToolResult.ToolID, msg.ToolResult.Output),
+			})
+		}
 	}
 }
 
@@ -299,13 +302,6 @@ func (s *Server) renderToolResult(toolID, content string) string {
 	}
 
 	return buf.String()
-}
-
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
 }
 
 func sanitizeLog(s string) string {

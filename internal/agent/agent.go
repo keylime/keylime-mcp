@@ -44,10 +44,10 @@ type Agent struct {
 	mcpCmd     *exec.Cmd
 	tools      []*mcp.Tool
 	messages   []Message
+	toolQueue  []ToolRequest
 }
 
 func NewAgent(cfg Config, provider LLMProvider) *Agent {
-	// Apply defaults
 	if cfg.Model == "" {
 		cfg.Model = DefaultModel
 	}
@@ -107,7 +107,7 @@ func (a *Agent) Close() {
 }
 
 func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage func(Message)) error {
-	a.messages = append(a.messages, Message{Role: RoleUser, Content: []Content{{Type: ContentTypeText, Text: userMessage}}})
+	a.messages = append(a.messages, Message{Role: RoleUser, Text: userMessage})
 	return a.callLLM(ctx, onMessage)
 }
 
@@ -119,29 +119,27 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 		Messages:     a.messages,
 		Tools:        a.tools,
 	})
-
 	if err != nil {
 		return err
 	}
-	for _, textBlock := range response.TextBlocks {
-		a.messages = append(a.messages, Message{Role: RoleAssistant, Content: []Content{{Type: ContentTypeText, Text: textBlock}}})
-		onMessage(Message{Role: RoleAssistant, Content: []Content{{Type: ContentTypeText, Text: textBlock}}})
-	}
-	for _, toolUse := range response.ToolUses {
-		msg := Message{
-			Role: RoleTool,
-			Content: []Content{
-				{
-					Type:      ContentTypeToolUse,
-					ToolID:    toolUse.ID,
-					ToolName:  toolUse.Name,
-					ToolInput: toolUse.Arguments,
-				},
-			},
-		}
 
-		a.messages = append(a.messages, msg)
-		onMessage(msg)
+	msg := Message{
+		Role:      RoleAssistant,
+		Text:      strings.Join(response.TextBlocks, "\n"),
+		ToolCalls: response.ToolUses,
+	}
+	a.messages = append(a.messages, msg)
+
+	if msg.Text != "" {
+		onMessage(Message{Role: RoleAssistant, Text: msg.Text})
+	}
+
+	a.toolQueue = make([]ToolRequest, len(response.ToolUses))
+	copy(a.toolQueue, response.ToolUses)
+
+	if len(a.toolQueue) > 0 {
+		tc := a.toolQueue[0]
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{tc}})
 	}
 
 	return nil
@@ -166,20 +164,45 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 	default:
 		resultText = extractTextContent(result.Content)
 	}
+
 	msg := Message{
 		Role: RoleTool,
-		Content: []Content{
-			{
-				Type:    ContentTypeToolResult,
-				Text:    resultText,
-				IsError: isError,
-			},
+		ToolResult: &ToolResult{
+			ToolID:  toolRequest.ID,
+			Output:  resultText,
+			IsError: isError,
 		},
 	}
 	a.messages = append(a.messages, msg)
 	onMessage(msg)
 
-	return nil
+	return a.advanceToolQueue(ctx, onMessage)
+}
+
+func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
+	a.messages = append(a.messages, Message{
+		Role: RoleTool,
+		ToolResult: &ToolResult{
+			ToolID: tool.ID,
+			Output: "Tool execution denied by user.",
+		},
+	})
+
+	return a.advanceToolQueue(ctx, onMessage)
+}
+
+func (a *Agent) advanceToolQueue(ctx context.Context, onMessage func(Message)) error {
+	if len(a.toolQueue) > 0 {
+		a.toolQueue = a.toolQueue[1:]
+	}
+
+	if len(a.toolQueue) > 0 {
+		tc := a.toolQueue[0]
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{tc}})
+		return nil
+	}
+
+	return a.callLLM(ctx, onMessage)
 }
 
 func extractTextContent(content []mcp.Content) string {
@@ -194,19 +217,7 @@ func extractTextContent(content []mcp.Content) string {
 	return resultText.String()
 }
 
-func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
-	a.messages = append(a.messages, Message{
-		Role: RoleTool,
-		Content: []Content{
-			{
-				Type: ContentTypeToolResult,
-				Text: "Tool execution denied by user.",
-			},
-		},
-	})
-	return a.callLLM(ctx, onMessage)
-}
-
 func (a *Agent) Reset() {
 	a.messages = []Message{}
+	a.toolQueue = nil
 }
