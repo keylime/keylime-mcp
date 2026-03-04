@@ -90,6 +90,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 	message := r.FormValue("message")
 	if message == "" {
 		http.Error(w, "Message required", http.StatusBadRequest)
