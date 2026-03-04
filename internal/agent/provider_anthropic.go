@@ -9,19 +9,28 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type ClaudeProvider struct {
+type AnthropicProvider struct {
 	client anthropic.Client
 }
 
-func NewClaudeProvider(apiKey string) *ClaudeProvider {
-	return &ClaudeProvider{
+func NewClaudeProvider(apiKey string) *AnthropicProvider {
+	return &AnthropicProvider{
 		client: anthropic.NewClient(option.WithAPIKey(apiKey)),
 	}
 }
 
-func (p *ClaudeProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error) {
-	messages := convertMessagesToClaude(opts.Messages)
-	tools := convertToolsToClaude(opts.Tools)
+func NewOllamaProvider(baseURL string) *AnthropicProvider {
+	return &AnthropicProvider{
+		client: anthropic.NewClient(
+			option.WithBaseURL(baseURL),
+			option.WithAPIKey("ollama"),
+		),
+	}
+}
+
+func (p *AnthropicProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error) {
+	messages := convertMessagesToAnthropic(opts.Messages)
+	tools := convertToolsToAnthropic(opts.Tools)
 
 	response, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(opts.Model),
@@ -31,13 +40,13 @@ func (p *ClaudeProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMRespon
 		Tools:     tools,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("claude API error: %w", err)
+		return nil, fmt.Errorf("LLM API error: %w", err)
 	}
 
-	return parseClaudeResponse(response), nil
+	return parseAnthropicResponse(response), nil
 }
 
-func convertMessagesToClaude(messages []Message) []anthropic.MessageParam {
+func convertMessagesToAnthropic(messages []Message) []anthropic.MessageParam {
 	result := make([]anthropic.MessageParam, 0, len(messages))
 
 	i := 0
@@ -77,15 +86,15 @@ func convertMessagesToClaude(messages []Message) []anthropic.MessageParam {
 	return result
 }
 
-func convertToolsToClaude(tools []*mcp.Tool) []anthropic.ToolUnionParam {
+func convertToolsToAnthropic(tools []*mcp.Tool) []anthropic.ToolUnionParam {
 	result := make([]anthropic.ToolUnionParam, 0, len(tools))
 	for _, tool := range tools {
-		result = append(result, convertMCPToolToClaude(tool))
+		result = append(result, convertMCPToolToAnthropic(tool))
 	}
 	return result
 }
 
-func convertMCPToolToClaude(tool *mcp.Tool) anthropic.ToolUnionParam {
+func convertMCPToolToAnthropic(tool *mcp.Tool) anthropic.ToolUnionParam {
 	inputSchemaMap, ok := tool.InputSchema.(map[string]any)
 	if !ok || inputSchemaMap == nil {
 		inputSchemaMap = map[string]any{}
@@ -120,7 +129,7 @@ func convertMCPToolToClaude(tool *mcp.Tool) anthropic.ToolUnionParam {
 	return toolParam
 }
 
-func parseClaudeResponse(response *anthropic.Message) *LLMResponse {
+func parseAnthropicResponse(response *anthropic.Message) *LLMResponse {
 	result := &LLMResponse{}
 
 	for _, block := range response.Content {
