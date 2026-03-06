@@ -51,7 +51,7 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Ollama API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("ollama API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var tagsResp struct {

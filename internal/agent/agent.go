@@ -6,6 +6,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -43,8 +44,10 @@ type Agent struct {
 	mcpSession *mcp.ClientSession
 	mcpCmd     *exec.Cmd
 	tools      []*mcp.Tool
-	messages   []Message
-	toolQueue  []ToolRequest
+
+	mu        sync.Mutex
+	messages  []Message
+	toolQueue []ToolRequest
 }
 
 func NewAgent(cfg Config, provider LLMProvider) *Agent {
@@ -107,6 +110,8 @@ func (a *Agent) Close() {
 }
 
 func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage func(Message)) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.messages = append(a.messages, Message{Role: RoleUser, Text: userMessage})
 	return a.callLLM(ctx, onMessage)
 }
@@ -146,6 +151,8 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 }
 
 func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMessage func(Message)) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	result, err := a.mcpSession.CallTool(ctx, &mcp.CallToolParams{
 		Name:      toolRequest.Name,
 		Arguments: toolRequest.Arguments,
@@ -180,6 +187,8 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 }
 
 func (a *Agent) GetCurrentTool() *ToolRequest {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if len(a.toolQueue) == 0 {
 		return nil
 	}
@@ -187,6 +196,8 @@ func (a *Agent) GetCurrentTool() *ToolRequest {
 }
 
 func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.messages = append(a.messages, Message{
 		Role: RoleTool,
 		ToolResult: &ToolResult{
@@ -225,15 +236,21 @@ func extractTextContent(content []mcp.Content) string {
 }
 
 func (a *Agent) Reset() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.messages = []Message{}
 	a.toolQueue = nil
 }
 
 func (a *Agent) SetModel(provider LLMProvider, model string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.provider = provider
 	a.config.Model = model
 }
 
 func (a *Agent) GetModel() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.config.Model
 }
