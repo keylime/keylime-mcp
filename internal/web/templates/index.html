@@ -83,6 +83,90 @@
             font-weight: 400;
         }
 
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .model-selector-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .model-selector-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+
+        .model-selector {
+            appearance: none;
+            -webkit-appearance: none;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 7px 32px 7px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            min-width: 200px;
+            max-width: 320px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            text-overflow: ellipsis;
+        }
+
+        .model-selector:hover {
+            border-color: var(--text-muted);
+            background-color: var(--border-color);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        .model-selector:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 1px var(--accent-cyan);
+        }
+
+        .model-selector option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 4px 8px;
+        }
+
+        .model-selector optgroup {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-style: normal;
+        }
+
+        .model-selector:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .model-loading {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .model-loading .spinner {
+            width: 12px;
+            height: 12px;
+        }
+
         .header-actions {
             display: flex;
             gap: 8px;
@@ -473,6 +557,14 @@
             <div class="logo-icon">K</div>
             <div class="logo-text">Keylime <span>MCP Agent</span></div>
         </div>
+        <div class="header-center">
+            <div class="model-selector-wrapper">
+                <span class="model-selector-label">Model:</span>
+                <select class="model-selector" id="model-selector" disabled>
+                    <option value="">Loading models...</option>
+                </select>
+            </div>
+        </div>
         <div class="header-actions">
             <button class="btn" id="reset-btn">New Chat</button>
         </div>
@@ -522,9 +614,92 @@
         const resetBtn = document.getElementById('reset-btn');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const modelSelector = document.getElementById('model-selector');
 
         let eventSource = null;
         let isProcessing = false;
+
+        // Model selector logic
+        async function loadModels() {
+            try {
+                const [modelsResp, currentResp] = await Promise.all([
+                    fetch('/api/models'),
+                    fetch('/api/model')
+                ]);
+                const models = await modelsResp.json();
+                const current = await currentResp.json();
+
+                modelSelector.innerHTML = '';
+
+                if (!models || models.length === 0) {
+                    modelSelector.innerHTML = '<option value="">No models available</option>';
+                    return;
+                }
+
+                // Group models by provider
+                const grouped = {};
+                for (const m of models) {
+                    if (!grouped[m.provider]) grouped[m.provider] = [];
+                    grouped[m.provider].push(m);
+                }
+
+                const providerLabels = {
+                    'anthropic': 'Anthropic (Claude)',
+                    'ollama': 'Ollama (Local)'
+                };
+
+                for (const [provider, providerModels] of Object.entries(grouped)) {
+                    const group = document.createElement('optgroup');
+                    group.label = providerLabels[provider] || provider;
+                    for (const m of providerModels) {
+                        const opt = document.createElement('option');
+                        opt.value = JSON.stringify({ provider: m.provider, model: m.id });
+                        opt.textContent = m.display_name || m.id;
+                        if (m.id === current.model) {
+                            opt.selected = true;
+                        }
+                        group.appendChild(opt);
+                    }
+                    modelSelector.appendChild(group);
+                }
+
+                // If no model matched current, check if we should add it as a custom entry
+                if (current.model && !modelSelector.querySelector('option[selected]')) {
+                    const firstOpt = modelSelector.querySelector('option');
+                    if (firstOpt) firstOpt.selected = true;
+                }
+
+                modelSelector.disabled = false;
+            } catch (err) {
+                console.error('Failed to load models:', err);
+                modelSelector.innerHTML = '<option value="">Failed to load models</option>';
+            }
+        }
+
+        modelSelector.addEventListener('change', async () => {
+            const val = modelSelector.value;
+            if (!val) return;
+
+            try {
+                const { provider, model } = JSON.parse(val);
+                modelSelector.disabled = true;
+
+                const resp = await fetch('/api/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, model })
+                });
+
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    console.error('Failed to set model:', errText);
+                }
+            } catch (err) {
+                console.error('Failed to switch model:', err);
+            } finally {
+                modelSelector.disabled = false;
+            }
+        });
 
         // Auto-resize textarea
         messageInput.addEventListener('input', () => {
@@ -556,6 +731,7 @@
             eventSource.addEventListener('user-message', (e) => {
                 hideEmptyState();
                 appendHTML(e.data);
+                showLoading();
                 scrollToBottom();
             });
 
@@ -646,7 +822,6 @@
                 const formData = new FormData();
                 formData.append('message', message);
                 await fetch('/chat', { method: 'POST', body: formData });
-                showLoading();
             } catch (err) {
                 setProcessing(false);
                 console.error('Failed to send message:', err);
@@ -736,6 +911,7 @@
 
 
         connect();
+        loadModels();
     </script>
 </body>
 </html>

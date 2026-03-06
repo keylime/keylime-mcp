@@ -21,6 +21,7 @@ var templatesFS embed.FS
 // Server represents the web server for the chat interface
 type Server struct {
 	agent     *agent.Agent
+	providers []agent.LLMProvider
 	templates *template.Template
 	eventChan chan SSEvent
 	ctx       context.Context
@@ -33,7 +34,7 @@ type SSEvent struct {
 }
 
 // NewServer creates a new web server instance
-func NewServer(ctx context.Context, ag *agent.Agent) (*Server, error) {
+func NewServer(ctx context.Context, ag *agent.Agent, providers []agent.LLMProvider) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
@@ -41,6 +42,7 @@ func NewServer(ctx context.Context, ag *agent.Agent) (*Server, error) {
 
 	return &Server{
 		agent:     ag,
+		providers: providers,
 		templates: tmpl,
 		eventChan: make(chan SSEvent, 100),
 		ctx:       ctx,
@@ -57,6 +59,9 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("POST /tool/deny", s.handleToolDeny)
 	mux.HandleFunc("GET /events", s.handleSSE)
 	mux.HandleFunc("POST /reset", s.handleReset)
+	mux.HandleFunc("GET /api/models", s.handleListModels)
+	mux.HandleFunc("GET /api/model", s.handleGetModel)
+	mux.HandleFunc("POST /api/model", s.handleSetModel)
 
 	server := &http.Server{
 		Addr:              addr,
@@ -258,6 +263,65 @@ func (s *Server) send(event SSEvent) {
 	default:
 		log.Printf("[SSE] Channel full, dropping event: %s", event.Event)
 	}
+}
+
+func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
+	var allModels []agent.ModelInfo
+
+	for _, p := range s.providers {
+		models, err := p.ListModels(r.Context())
+		if err != nil {
+			log.Printf("[MODELS] Failed to list %s models: %v", p.Name(), err)
+			continue
+		}
+		allModels = append(allModels, models...)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(allModels); err != nil {
+		log.Printf("[ERROR] Failed to encode models response: %v", err)
+	}
+}
+
+func (s *Server) handleGetModel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]string{"model": s.agent.GetModel()}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] Failed to encode model response: %v", err)
+	}
+}
+
+func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Model == "" {
+		http.Error(w, "Model is required", http.StatusBadRequest)
+		return
+	}
+
+	for _, p := range s.providers {
+		if p.Name() == req.Provider {
+			s.agent.SetModel(p, req.Model)
+			log.Printf("[MODEL] Switched to %s/%s", req.Provider, req.Model)
+
+			w.Header().Set("Content-Type", "application/json")
+			resp := map[string]string{"model": req.Model, "provider": req.Provider}
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("[ERROR] Failed to encode set model response: %v", err)
+			}
+			return
+		}
+	}
+
+	http.Error(w, fmt.Sprintf("Unknown provider: %s", req.Provider), http.StatusBadRequest)
 }
 
 func (s *Server) renderMessage(role, content, toolID string, tool *agent.ToolRequest) string {

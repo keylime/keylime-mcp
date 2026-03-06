@@ -53,14 +53,14 @@ func main() {
 		return
 	}
 
-	provider, model := createProvider()
+	providers, initialProvider, initialModel := createProviders()
 
 	cfg := agent.Config{ServerPath: serverPath}
-	if model != "" {
-		cfg.Model = model
+	if initialModel != "" {
+		cfg.Model = initialModel
 	}
 
-	agentInstance := agent.NewAgent(cfg, provider)
+	agentInstance := agent.NewAgent(cfg, initialProvider)
 
 	if err := agentInstance.Connect(ctx); err != nil {
 		log.Printf("Failed to connect to MCP server: %v", err)
@@ -74,7 +74,7 @@ func main() {
 		return
 	}
 
-	srv, err := web.NewServer(ctx, agentInstance)
+	srv, err := web.NewServer(ctx, agentInstance, providers)
 	if err != nil {
 		log.Printf("Failed to create web server: %v", err)
 		return
@@ -89,26 +89,35 @@ func main() {
 	}
 }
 
-// createProvider selects the LLM provider based on environment variables.
-// OLLAMA_URL or OLLAMA_MODEL → local Ollama (Anthropic-compatible API)
-// ANTHROPIC_API_KEY → Claude cloud API
-func createProvider() (agent.LLMProvider, string) {
+func createProviders() ([]agent.LLMProvider, agent.LLMProvider, string) {
 	ollamaURL := os.Getenv("OLLAMA_URL")
 	ollamaModel := os.Getenv("OLLAMA_MODEL")
+	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
 
-	if ollamaURL != "" || ollamaModel != "" {
-		if ollamaURL == "" {
-			ollamaURL = defaultOllamaURL
-		}
-		log.Printf("Using Ollama provider at %s", ollamaURL)
-		return agent.NewOllamaProvider(ollamaURL), ollamaModel
+	if ollamaURL == "" {
+		ollamaURL = defaultOllamaURL
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
-	if apiKey == "" {
+	var providers []agent.LLMProvider
+
+	var claudeProvider *agent.AnthropicProvider
+	if apiKey != "" {
+		claudeProvider = agent.NewClaudeProvider(apiKey)
+		providers = append(providers, claudeProvider)
+	}
+
+	ollamaProvider := agent.NewOllamaProvider(ollamaURL)
+	providers = append(providers, ollamaProvider)
+
+	if ollamaModel != "" || os.Getenv("OLLAMA_URL") != "" {
+		log.Printf("Using Ollama provider at %s", ollamaURL)
+		return providers, ollamaProvider, ollamaModel
+	}
+
+	if claudeProvider == nil {
 		log.Fatal("Set ANTHROPIC_API_KEY for Claude or OLLAMA_URL/OLLAMA_MODEL for local Ollama")
 	}
 
 	log.Printf("Using Claude provider")
-	return agent.NewClaudeProvider(apiKey), ""
+	return providers, claudeProvider, ""
 }

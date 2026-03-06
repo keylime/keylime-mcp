@@ -26,3 +26,9 @@ type ToolResult struct {
 	Output  string
 	IsError bool
 }
+
+type ModelInfo struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Provider    string `json:"provider"`
+}

@@ -228,3 +228,12 @@ func (a *Agent) Reset() {
 	a.messages = []Message{}
 	a.toolQueue = nil
 }
+
+func (a *Agent) SetModel(provider LLMProvider, model string) {
+	a.provider = provider
+	a.config.Model = model
+}
+
+func (a *Agent) GetModel() string {
+	return a.config.Model
+}

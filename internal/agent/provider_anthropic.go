@@ -6,33 +6,21 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type AnthropicProvider struct {
+// anthropicBase contains the shared Chat implementation for all providers
+// that use the Anthropic-compatible API (Anthropic cloud, Ollama, etc.).
+type anthropicBase struct {
 	client anthropic.Client
 }
 
-func NewClaudeProvider(apiKey string) *AnthropicProvider {
-	return &AnthropicProvider{
-		client: anthropic.NewClient(option.WithAPIKey(apiKey)),
-	}
-}
-
-func NewOllamaProvider(baseURL string) *AnthropicProvider {
-	return &AnthropicProvider{
-		client: anthropic.NewClient(
-			option.WithBaseURL(baseURL),
-			option.WithAPIKey("ollama"),
-		),
-	}
-}
-
-func (p *AnthropicProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error) {
+func (b *anthropicBase) Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error) {
 	messages := convertMessagesToAnthropic(opts.Messages)
 	tools := convertToolsToAnthropic(opts.Tools)
 
-	response, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
+	response, err := b.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(opts.Model),
 		MaxTokens: opts.MaxTokens,
 		System:    []anthropic.TextBlockParam{{Type: "text", Text: opts.SystemPrompt}},
@@ -44,6 +32,40 @@ func (p *AnthropicProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMRes
 	}
 
 	return parseAnthropicResponse(response), nil
+}
+
+type AnthropicProvider struct {
+	anthropicBase
+}
+
+func NewClaudeProvider(apiKey string) *AnthropicProvider {
+	return &AnthropicProvider{
+		anthropicBase: anthropicBase{
+			client: anthropic.NewClient(option.WithAPIKey(apiKey)),
+		},
+	}
+}
+
+func (p *AnthropicProvider) Name() string { return "anthropic" }
+
+func (p *AnthropicProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
+	page, err := p.client.Models.List(ctx, anthropic.ModelListParams{
+		Limit: param.NewOpt[int64](1000),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Anthropic models: %w", err)
+	}
+
+	models := make([]ModelInfo, 0, len(page.Data))
+	for _, m := range page.Data {
+		models = append(models, ModelInfo{
+			ID:          m.ID,
+			DisplayName: m.DisplayName,
+			Provider:    "anthropic",
+		})
+	}
+
+	return models, nil
 }
 
 func convertMessagesToAnthropic(messages []Message) []anthropic.MessageParam {
