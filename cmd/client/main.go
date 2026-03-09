@@ -55,9 +55,12 @@ func main() {
 
 	providers, initialProvider, initialModel := createProviders()
 
-	cfg := agent.Config{ServerPath: serverPath}
-	if initialModel != "" {
-		cfg.Model = initialModel
+	cfg := agent.Config{ServerPath: serverPath, Model: initialModel}
+	if cfg.Model == "" {
+		if models, err := initialProvider.ListModels(ctx); err == nil && len(models) > 0 {
+			cfg.Model = models[0].ID
+			log.Printf("Auto-selected model: %s", cfg.Model)
+		}
 	}
 
 	agentInstance := agent.NewAgent(cfg, initialProvider)

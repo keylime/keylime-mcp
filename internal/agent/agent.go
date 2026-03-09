@@ -15,7 +15,6 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	DefaultModel     = "claude-haiku-4-5"
 	DefaultMaxTokens = 2048
 	DefaultMaxTurns  = 5
 
@@ -51,9 +50,6 @@ type Agent struct {
 }
 
 func NewAgent(cfg Config, provider LLMProvider) *Agent {
-	if cfg.Model == "" {
-		cfg.Model = DefaultModel
-	}
 	if cfg.MaxTokens == 0 {
 		cfg.MaxTokens = DefaultMaxTokens
 	}
@@ -111,8 +107,8 @@ func (a *Agent) Close() {
 
 func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage func(Message)) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.messages = append(a.messages, Message{Role: RoleUser, Text: userMessage})
+	a.mu.Unlock()
 	return a.callLLM(ctx, onMessage)
 }
 
@@ -151,8 +147,6 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 }
 
 func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMessage func(Message)) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	result, err := a.mcpSession.CallTool(ctx, &mcp.CallToolParams{
 		Name:      toolRequest.Name,
 		Arguments: toolRequest.Arguments,
@@ -180,7 +174,11 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 			IsError: isError,
 		},
 	}
+
+	a.mu.Lock()
 	a.messages = append(a.messages, msg)
+	a.mu.Unlock()
+
 	onMessage(msg)
 
 	return a.advanceToolQueue(ctx, onMessage)
@@ -197,7 +195,6 @@ func (a *Agent) GetCurrentTool() *ToolRequest {
 
 func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.messages = append(a.messages, Message{
 		Role: RoleTool,
 		ToolResult: &ToolResult{
@@ -205,6 +202,7 @@ func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(
 			Output: "Tool execution denied by user.",
 		},
 	})
+	a.mu.Unlock()
 
 	return a.advanceToolQueue(ctx, onMessage)
 }
