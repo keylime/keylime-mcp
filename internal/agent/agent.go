@@ -113,13 +113,18 @@ func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage f
 }
 
 func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
-	response, err := a.provider.Chat(ctx, ChatOptions{
+	a.mu.Lock()
+	opts := ChatOptions{
 		Model:        a.config.Model,
 		MaxTokens:    a.config.MaxTokens,
 		SystemPrompt: a.config.SystemPrompt,
 		Messages:     a.messages,
 		Tools:        a.tools,
-	})
+	}
+	provider := a.provider
+	a.mu.Unlock()
+
+	response, err := provider.Chat(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -129,18 +134,23 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 		Text:      strings.Join(response.TextBlocks, "\n"),
 		ToolCalls: response.ToolUses,
 	}
+
+	a.mu.Lock()
 	a.messages = append(a.messages, msg)
+	a.toolQueue = make([]ToolRequest, len(response.ToolUses))
+	copy(a.toolQueue, response.ToolUses)
+
+	var firstTool *ToolRequest
+	if len(a.toolQueue) > 0 {
+		firstTool = &a.toolQueue[0]
+	}
+	a.mu.Unlock()
 
 	if msg.Text != "" {
 		onMessage(Message{Role: RoleAssistant, Text: msg.Text})
 	}
-
-	a.toolQueue = make([]ToolRequest, len(response.ToolUses))
-	copy(a.toolQueue, response.ToolUses)
-
-	if len(a.toolQueue) > 0 {
-		tc := a.toolQueue[0]
-		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{tc}})
+	if firstTool != nil {
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*firstTool}})
 	}
 
 	return nil
@@ -208,13 +218,18 @@ func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(
 }
 
 func (a *Agent) advanceToolQueue(ctx context.Context, onMessage func(Message)) error {
+	a.mu.Lock()
 	if len(a.toolQueue) > 0 {
 		a.toolQueue = a.toolQueue[1:]
 	}
-
+	var nextTool *ToolRequest
 	if len(a.toolQueue) > 0 {
-		tc := a.toolQueue[0]
-		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{tc}})
+		nextTool = &a.toolQueue[0]
+	}
+	a.mu.Unlock()
+
+	if nextTool != nil {
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*nextTool}})
 		return nil
 	}
 
