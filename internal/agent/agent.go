@@ -114,11 +114,14 @@ func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage f
 
 func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 	a.mu.Lock()
+
+	messagesCopy := make([]Message, len(a.messages))
+	copy(messagesCopy, a.messages)
 	opts := ChatOptions{
 		Model:        a.config.Model,
 		MaxTokens:    a.config.MaxTokens,
 		SystemPrompt: a.config.SystemPrompt,
-		Messages:     a.messages,
+		Messages:     messagesCopy,
 		Tools:        a.tools,
 	}
 	provider := a.provider
