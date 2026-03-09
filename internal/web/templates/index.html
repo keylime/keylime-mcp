@@ -83,90 +83,6 @@
             font-weight: 400;
         }
 
-        .header-center {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .model-selector-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        .model-selector-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-right: 8px;
-            white-space: nowrap;
-        }
-
-        .model-selector {
-            appearance: none;
-            -webkit-appearance: none;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 7px 32px 7px 12px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            min-width: 200px;
-            max-width: 320px;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            text-overflow: ellipsis;
-        }
-
-        .model-selector:hover {
-            border-color: var(--text-muted);
-            background-color: var(--border-color);
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-        }
-
-        .model-selector:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 1px var(--accent-cyan);
-        }
-
-        .model-selector option {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            padding: 4px 8px;
-        }
-
-        .model-selector optgroup {
-            background: var(--bg-primary);
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-style: normal;
-        }
-
-        .model-selector:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .model-loading {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .model-loading .spinner {
-            width: 12px;
-            height: 12px;
-        }
-
         .header-actions {
             display: flex;
             gap: 8px;
@@ -465,6 +381,60 @@
             height: 20px;
         }
 
+        .input-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            gap: 12px;
+        }
+
+        .model-selector {
+            appearance: none;
+            -webkit-appearance: none;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 24px 4px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            max-width: 280px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236e7681' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            text-overflow: ellipsis;
+        }
+
+        .model-selector:hover {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+
+        .model-selector:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .model-selector option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .model-selector optgroup {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-style: normal;
+        }
+
+        .model-selector:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* Status indicator */
         .status {
             display: flex;
@@ -472,7 +442,6 @@
             gap: 6px;
             font-size: 12px;
             color: var(--text-muted);
-            margin-top: 8px;
         }
 
         .status-dot {
@@ -557,14 +526,6 @@
             <div class="logo-icon">K</div>
             <div class="logo-text">Keylime <span>MCP Agent</span></div>
         </div>
-        <div class="header-center">
-            <div class="model-selector-wrapper">
-                <span class="model-selector-label">Model:</span>
-                <select class="model-selector" id="model-selector" disabled>
-                    <option value="">Loading models...</option>
-                </select>
-            </div>
-        </div>
         <div class="header-actions">
             <button class="btn" id="reset-btn">New Chat</button>
         </div>
@@ -598,9 +559,14 @@
                     </button>
                 </div>
             </form>
-            <div class="status">
-                <div class="status-dot" id="status-dot"></div>
-                <span id="status-text">Connecting...</span>
+            <div class="input-footer">
+                <div class="status">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Connecting...</span>
+                </div>
+                <select class="model-selector" id="model-selector" disabled>
+                    <option value="">Loading models...</option>
+                </select>
             </div>
         </div>
     </div>
@@ -619,34 +585,34 @@
         let eventSource = null;
         let isProcessing = false;
 
-        // Model selector logic
+        const providerLabels = {
+            'anthropic': 'Anthropic (Claude)',
+            'ollama': 'Ollama (Local)'
+        };
+
         async function loadModels() {
             try {
                 const [modelsResp, currentResp] = await Promise.all([
                     fetch('/api/models'),
                     fetch('/api/model')
                 ]);
-                const models = await modelsResp.json();
+                const data = await modelsResp.json();
                 const current = await currentResp.json();
+                const models = data.models || [];
+                const ollamaStatus = data.ollama_status || '';
 
                 modelSelector.innerHTML = '';
 
-                if (!models || models.length === 0) {
+                if (models.length === 0 && !ollamaStatus) {
                     modelSelector.innerHTML = '<option value="">No models available</option>';
                     return;
                 }
 
-                // Group models by provider
                 const grouped = {};
                 for (const m of models) {
                     if (!grouped[m.provider]) grouped[m.provider] = [];
                     grouped[m.provider].push(m);
                 }
-
-                const providerLabels = {
-                    'anthropic': 'Anthropic (Claude)',
-                    'ollama': 'Ollama (Local)'
-                };
 
                 for (const [provider, providerModels] of Object.entries(grouped)) {
                     const group = document.createElement('optgroup');
@@ -655,18 +621,33 @@
                         const opt = document.createElement('option');
                         opt.value = JSON.stringify({ provider: m.provider, model: m.id });
                         opt.textContent = m.display_name || m.id;
-                        if (m.id === current.model) {
-                            opt.selected = true;
-                        }
+                        if (m.id === current.model) opt.selected = true;
                         group.appendChild(opt);
                     }
                     modelSelector.appendChild(group);
                 }
 
-                // If no model matched current, check if we should add it as a custom entry
-                if (current.model && !modelSelector.querySelector('option[selected]')) {
-                    const firstOpt = modelSelector.querySelector('option');
-                    if (firstOpt) firstOpt.selected = true;
+                if (ollamaStatus === 'not_running') {
+                    const group = document.createElement('optgroup');
+                    group.label = 'Ollama — not running';
+                    const opt = document.createElement('option');
+                    opt.disabled = true;
+                    opt.textContent = 'run: ollama serve';
+                    group.appendChild(opt);
+                    modelSelector.appendChild(group);
+                } else if (ollamaStatus === 'not_installed') {
+                    const group = document.createElement('optgroup');
+                    group.label = 'Ollama — not installed';
+                    const opt = document.createElement('option');
+                    opt.disabled = true;
+                    opt.textContent = 'ollama.com/download';
+                    group.appendChild(opt);
+                    modelSelector.appendChild(group);
+                }
+
+                if (!modelSelector.querySelector('option[selected]')) {
+                    const first = modelSelector.querySelector('option:not([disabled])');
+                    if (first) first.selected = true;
                 }
 
                 modelSelector.disabled = false;

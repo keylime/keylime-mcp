@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -267,18 +268,28 @@ func (s *Server) send(event SSEvent) {
 
 func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	var allModels []agent.ModelInfo
+	var ollamaStatus string
 
 	for _, p := range s.providers {
 		models, err := p.ListModels(r.Context())
 		if err != nil {
 			log.Printf("[MODELS] Failed to list %s models: %v", p.Name(), err)
+			if p.Name() == "ollama" {
+				ollamaStatus = "not_running"
+				if _, err := exec.LookPath("ollama"); err != nil {
+					ollamaStatus = "not_installed"
+				}
+			}
 			continue
 		}
 		allModels = append(allModels, models...)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(allModels); err != nil {
+	if err := json.NewEncoder(w).Encode(struct {
+		Models       []agent.ModelInfo `json:"models"`
+		OllamaStatus string            `json:"ollama_status,omitempty"`
+	}{allModels, ollamaStatus}); err != nil {
 		log.Printf("[ERROR] Failed to encode models response: %v", err)
 	}
 }
