@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -20,11 +21,11 @@ var templatesFS embed.FS
 
 // Server represents the web server for the chat interface
 type Server struct {
-	agent       *agent.Agent
-	templates   *template.Template
-	eventChan   chan SSEvent
-	pendingTool *agent.ToolRequest
-	ctx         context.Context
+	agent     *agent.Agent
+	providers []agent.LLMProvider
+	templates *template.Template
+	eventChan chan SSEvent
+	ctx       context.Context
 }
 
 // SSEvent represents a Server-Sent Event
@@ -34,7 +35,7 @@ type SSEvent struct {
 }
 
 // NewServer creates a new web server instance
-func NewServer(ctx context.Context, ag *agent.Agent) (*Server, error) {
+func NewServer(ctx context.Context, ag *agent.Agent, providers []agent.LLMProvider) (*Server, error) {
 	tmpl, err := template.ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
@@ -42,6 +43,7 @@ func NewServer(ctx context.Context, ag *agent.Agent) (*Server, error) {
 
 	return &Server{
 		agent:     ag,
+		providers: providers,
 		templates: tmpl,
 		eventChan: make(chan SSEvent, 100),
 		ctx:       ctx,
@@ -58,6 +60,9 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("POST /tool/deny", s.handleToolDeny)
 	mux.HandleFunc("GET /events", s.handleSSE)
 	mux.HandleFunc("POST /reset", s.handleReset)
+	mux.HandleFunc("GET /api/models", s.handleListModels)
+	mux.HandleFunc("GET /api/model", s.handleGetModel)
+	mux.HandleFunc("POST /api/model", s.handleSetModel)
 
 	server := &http.Server{
 		Addr:              addr,
@@ -91,13 +96,12 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 	message := r.FormValue("message")
 	if message == "" {
 		http.Error(w, "Message required", http.StatusBadRequest)
 		return
 	}
-
-	log.Printf("[CHAT] User message: %s", sanitizeLog(message))
 
 	s.send(SSEvent{
 		Event: "user-message",
@@ -129,46 +133,45 @@ func (s *Server) handleMessage(msg agent.Message) {
 	log.Printf("[AGENT] Callback: role=%s", msg.Role)
 
 	switch msg.Role {
-	case "tool_result":
-		log.Printf("[TOOL] Result: %s", truncate(msg.Content, 100))
-		s.send(SSEvent{
-			Event: "tool-result",
-			Data:  s.renderToolResult(msg.ToolID, msg.Content),
-		})
+	case agent.RoleAssistant:
+		if msg.Text != "" {
+			s.send(SSEvent{
+				Event: "assistant-message",
+				Data:  s.renderMessage("assistant", msg.Text, "", nil),
+			})
+		}
+		if len(msg.ToolCalls) > 0 {
+			tc := msg.ToolCalls[0]
+			log.Printf("[AGENT] Tool request: %s", tc.Name)
+			s.send(SSEvent{
+				Event: "tool-request",
+				Data:  s.renderMessage("tool-request", "", tc.ID, &tc),
+			})
+		}
 
-	case "assistant":
-		log.Printf("[AGENT] Assistant response: %s", truncate(msg.Content, 100))
-		s.send(SSEvent{
-			Event: "assistant-message",
-			Data:  s.renderMessage("assistant", msg.Content, "", nil),
-		})
-
-	case "tool_request":
-		log.Printf("[AGENT] Tool request: %s", msg.Tool.Name)
-		s.pendingTool = msg.Tool
-		s.send(SSEvent{
-			Event: "tool-request",
-			Data:  s.renderMessage("tool-request", "", msg.ToolID, msg.Tool),
-		})
+	case agent.RoleTool:
+		if msg.ToolResult != nil {
+			s.send(SSEvent{
+				Event: "tool-result",
+				Data:  s.renderToolResult(msg.ToolResult.ToolID, msg.ToolResult.Output),
+			})
+		}
 	}
 }
 
 func (s *Server) handleToolApprove(w http.ResponseWriter, r *http.Request) {
-	if s.pendingTool == nil {
+	tool := s.agent.GetCurrentTool()
+	if tool == nil {
 		http.Error(w, "No pending tool request", http.StatusBadRequest)
 		return
 	}
-
-	log.Printf("[TOOL] Approved: %s", s.pendingTool.Name)
-	go s.executeTool(s.pendingTool)
-	s.pendingTool = nil
+	go s.executeTool(tool)
 
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleToolDeny(w http.ResponseWriter, r *http.Request) {
-	tool := s.pendingTool
-	s.pendingTool = nil
+	tool := s.agent.GetCurrentTool()
 	if tool == nil {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -213,7 +216,6 @@ func (s *Server) executeTool(tool *agent.ToolRequest) {
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[CHAT] Reset conversation")
 	s.agent.Reset()
-	s.pendingTool = nil
 
 	s.send(SSEvent{
 		Event: "reset",
@@ -264,6 +266,75 @@ func (s *Server) send(event SSEvent) {
 	}
 }
 
+func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
+	var allModels []agent.ModelInfo
+	var ollamaStatus string
+
+	for _, p := range s.providers {
+		models, err := p.ListModels(r.Context())
+		if err != nil {
+			log.Printf("[MODELS] Failed to list %s models: %v", p.Name(), err)
+			if p.Name() == "ollama" {
+				ollamaStatus = "not_running"
+				if _, err := exec.LookPath("ollama"); err != nil {
+					ollamaStatus = "not_installed"
+				}
+			}
+			continue
+		}
+		allModels = append(allModels, models...)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(struct {
+		Models       []agent.ModelInfo `json:"models"`
+		OllamaStatus string            `json:"ollama_status,omitempty"`
+	}{allModels, ollamaStatus}); err != nil {
+		log.Printf("[ERROR] Failed to encode models response: %v", err)
+	}
+}
+
+func (s *Server) handleGetModel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]string{"model": s.agent.GetModel()}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] Failed to encode model response: %v", err)
+	}
+}
+
+func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Model == "" {
+		http.Error(w, "Model is required", http.StatusBadRequest)
+		return
+	}
+
+	for _, p := range s.providers {
+		if p.Name() == req.Provider {
+			s.agent.SetModel(p, req.Model)
+			log.Printf("[MODEL] Switched to %s/%s", req.Provider, req.Model)
+
+			w.Header().Set("Content-Type", "application/json")
+			resp := map[string]string{"model": req.Model, "provider": req.Provider}
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("[ERROR] Failed to encode set model response: %v", err)
+			}
+			return
+		}
+	}
+
+	http.Error(w, fmt.Sprintf("Unknown provider: %s", req.Provider), http.StatusBadRequest)
+}
+
 func (s *Server) renderMessage(role, content, toolID string, tool *agent.ToolRequest) string {
 	data := map[string]interface{}{
 		"Role":    role,
@@ -299,17 +370,4 @@ func (s *Server) renderToolResult(toolID, content string) string {
 	}
 
 	return buf.String()
-}
-
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}
-
-func sanitizeLog(s string) string {
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\r", "\\r")
-	return s
 }

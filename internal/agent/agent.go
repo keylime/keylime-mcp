@@ -6,9 +6,8 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -16,7 +15,6 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	DefaultModel     = anthropic.ModelClaude3_5HaikuLatest
 	DefaultMaxTokens = 2048
 	DefaultMaxTurns  = 5
 
@@ -32,41 +30,26 @@ You have a maximum of 5 conversation turns to complete the task. When given a ta
 )
 
 type Config struct {
-	APIKey       string // #nosec G117 -- field name for API key config, value is not hardcoded
 	ServerPath   string
-	Model        anthropic.Model
+	Model        string
 	MaxTokens    int64
 	MaxTurns     int
 	SystemPrompt string
 }
 
 type Agent struct {
-	config          Config
-	anthropicClient anthropic.Client
-	mcpSession      *mcp.ClientSession
-	mcpCmd          *exec.Cmd
-	tools           []anthropic.ToolUnionParam
-	messages        []anthropic.MessageParam
+	config     Config
+	provider   LLMProvider
+	mcpSession *mcp.ClientSession
+	mcpCmd     *exec.Cmd
+	tools      []*mcp.Tool
+
+	mu        sync.Mutex
+	messages  []Message
+	toolQueue []ToolRequest
 }
 
-type Message struct {
-	Role    string // "user", "assistant", "tool_request", "tool_result"
-	Content string
-	ToolID  string
-	Tool    *ToolRequest
-}
-
-type ToolRequest struct {
-	ID        string
-	Name      string
-	Arguments any
-}
-
-func NewAgent(cfg Config) *Agent {
-	// Apply defaults
-	if cfg.Model == "" {
-		cfg.Model = DefaultModel
-	}
+func NewAgent(cfg Config, provider LLMProvider) *Agent {
 	if cfg.MaxTokens == 0 {
 		cfg.MaxTokens = DefaultMaxTokens
 	}
@@ -78,9 +61,9 @@ func NewAgent(cfg Config) *Agent {
 	}
 
 	return &Agent{
-		config:          cfg,
-		anthropicClient: anthropic.NewClient(option.WithAPIKey(cfg.APIKey)),
-		messages:        []anthropic.MessageParam{},
+		config:   cfg,
+		provider: provider,
+		messages: []Message{},
 	}
 }
 
@@ -101,50 +84,12 @@ func (a *Agent) Connect(ctx context.Context) error {
 }
 
 func (a *Agent) GetTools(ctx context.Context) error {
-	tools, err := a.mcpSession.ListTools(ctx, &mcp.ListToolsParams{})
+	result, err := a.mcpSession.ListTools(ctx, &mcp.ListToolsParams{})
 	if err != nil {
 		return fmt.Errorf("failed to list tools: %w", err)
 	}
-	a.tools = make([]anthropic.ToolUnionParam, 0, len(tools.Tools))
-	for _, tool := range tools.Tools {
-		a.tools = append(a.tools, convertMCPToolToClaudeTool(tool))
-	}
+	a.tools = result.Tools
 	return nil
-}
-
-func convertMCPToolToClaudeTool(tool *mcp.Tool) anthropic.ToolUnionParam {
-	inputSchemaMap, ok := tool.InputSchema.(map[string]any)
-	if !ok || inputSchemaMap == nil {
-		inputSchemaMap = map[string]any{}
-	}
-
-	var properties any
-	if p, ok := inputSchemaMap["properties"].(map[string]any); ok && p != nil {
-		properties = p
-	} else {
-		properties = map[string]any{}
-	}
-
-	var required []string
-	if r, ok := inputSchemaMap["required"].([]interface{}); ok {
-		for _, v := range r {
-			if s, ok := v.(string); ok {
-				required = append(required, s)
-			}
-		}
-	}
-
-	toolParam := anthropic.ToolUnionParamOfTool(
-		anthropic.ToolInputSchemaParam{
-			Type:       "object",
-			Properties: properties,
-			Required:   required,
-		},
-		tool.Name,
-	)
-
-	toolParam.OfTool.Description = anthropic.String(tool.Description)
-	return toolParam
 }
 
 func (a *Agent) Close() {
@@ -161,62 +106,57 @@ func (a *Agent) Close() {
 }
 
 func (a *Agent) SendMessage(ctx context.Context, userMessage string, onMessage func(Message)) error {
-	a.messages = append(a.messages, anthropic.NewUserMessage(anthropic.NewTextBlock(userMessage)))
-	// TODO: add maximum turns and add support for gemini
-	return a.callClaude(ctx, onMessage)
+	a.mu.Lock()
+	a.messages = append(a.messages, Message{Role: RoleUser, Text: userMessage})
+	a.mu.Unlock()
+	return a.callLLM(ctx, onMessage)
 }
 
-func (a *Agent) callClaude(ctx context.Context, onMessage func(Message)) error {
-	response, err := a.anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     a.config.Model,
-		MaxTokens: a.config.MaxTokens,
-		System:    []anthropic.TextBlockParam{{Type: "text", Text: a.config.SystemPrompt}},
-		Messages:  a.messages,
-		Tools:     a.tools,
-	})
+func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
+	a.mu.Lock()
+
+	messagesCopy := make([]Message, len(a.messages))
+	copy(messagesCopy, a.messages)
+	opts := ChatOptions{
+		Model:        a.config.Model,
+		MaxTokens:    a.config.MaxTokens,
+		SystemPrompt: a.config.SystemPrompt,
+		Messages:     messagesCopy,
+		Tools:        a.tools,
+	}
+	provider := a.provider
+	a.mu.Unlock()
+
+	response, err := provider.Chat(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("claude API error: %w", err)
+		return err
 	}
 
-	assistantContent, toolRequests := a.processResponse(response, onMessage)
-
-	a.messages = append(a.messages, anthropic.NewAssistantMessage(assistantContent...))
-
-	for _, toolRequest := range toolRequests {
-		onMessage(Message{
-			Role:    "tool_request",
-			Content: toolRequest.Name,
-			ToolID:  toolRequest.ID,
-			Tool:    toolRequest,
-		})
+	msg := Message{
+		Role:      RoleAssistant,
+		Text:      strings.Join(response.TextBlocks, "\n"),
+		ToolCalls: response.ToolUses,
 	}
+
+	a.mu.Lock()
+	a.messages = append(a.messages, msg)
+	a.toolQueue = make([]ToolRequest, len(response.ToolUses))
+	copy(a.toolQueue, response.ToolUses)
+
+	var firstTool *ToolRequest
+	if len(a.toolQueue) > 0 {
+		firstTool = &a.toolQueue[0]
+	}
+	a.mu.Unlock()
+
+	if msg.Text != "" {
+		onMessage(Message{Role: RoleAssistant, Text: msg.Text})
+	}
+	if firstTool != nil {
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*firstTool}})
+	}
+
 	return nil
-}
-
-func (a *Agent) processResponse(response *anthropic.Message, onMessage func(Message)) (
-	[]anthropic.ContentBlockParamUnion,
-	[]*ToolRequest,
-) {
-	var assistantContent []anthropic.ContentBlockParamUnion
-	var toolRequests []*ToolRequest
-
-	for _, block := range response.Content {
-		switch content := block.AsAny().(type) {
-		case anthropic.TextBlock:
-			onMessage(Message{Role: "assistant", Content: content.Text})
-			assistantContent = append(assistantContent, anthropic.NewTextBlock(content.Text))
-
-		case anthropic.ToolUseBlock:
-			assistantContent = append(assistantContent, anthropic.NewToolUseBlock(content.ID, content.Input, content.Name))
-			toolRequests = append(toolRequests, &ToolRequest{
-				ID:        content.ID,
-				Name:      content.Name,
-				Arguments: content.Input,
-			})
-		}
-	}
-
-	return assistantContent, toolRequests
 }
 
 func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMessage func(Message)) error {
@@ -239,17 +179,64 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMes
 		resultText = extractTextContent(result.Content)
 	}
 
-	onMessage(Message{
-		Role:    "tool_result",
-		Content: resultText,
-		ToolID:  toolRequest.ID,
+	msg := Message{
+		Role: RoleTool,
+		ToolResult: &ToolResult{
+			ToolID:  toolRequest.ID,
+			Output:  resultText,
+			IsError: isError,
+		},
+	}
+
+	a.mu.Lock()
+	a.messages = append(a.messages, msg)
+	a.mu.Unlock()
+
+	onMessage(msg)
+
+	return a.advanceToolQueue(ctx, onMessage)
+}
+
+func (a *Agent) GetCurrentTool() *ToolRequest {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.toolQueue) == 0 {
+		return nil
+	}
+	return &a.toolQueue[0]
+}
+
+func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
+	a.mu.Lock()
+	a.messages = append(a.messages, Message{
+		Role: RoleTool,
+		ToolResult: &ToolResult{
+			ToolID: tool.ID,
+			Output: "Tool execution denied by user.",
+		},
 	})
+	a.mu.Unlock()
 
-	a.messages = append(a.messages, anthropic.NewUserMessage(
-		anthropic.NewToolResultBlock(toolRequest.ID, resultText, isError),
-	))
+	return a.advanceToolQueue(ctx, onMessage)
+}
 
-	return a.callClaude(ctx, onMessage)
+func (a *Agent) advanceToolQueue(ctx context.Context, onMessage func(Message)) error {
+	a.mu.Lock()
+	if len(a.toolQueue) > 0 {
+		a.toolQueue = a.toolQueue[1:]
+	}
+	var nextTool *ToolRequest
+	if len(a.toolQueue) > 0 {
+		nextTool = &a.toolQueue[0]
+	}
+	a.mu.Unlock()
+
+	if nextTool != nil {
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*nextTool}})
+		return nil
+	}
+
+	return a.callLLM(ctx, onMessage)
 }
 
 func extractTextContent(content []mcp.Content) string {
@@ -264,13 +251,22 @@ func extractTextContent(content []mcp.Content) string {
 	return resultText.String()
 }
 
-func (a *Agent) ToolDeny(ctx context.Context, tool *ToolRequest, onMessage func(Message)) error {
-	a.messages = append(a.messages, anthropic.NewUserMessage(
-		anthropic.NewToolResultBlock(tool.ID, "Tool execution denied by user.", false),
-	))
-	return a.callClaude(ctx, onMessage)
+func (a *Agent) Reset() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.messages = []Message{}
+	a.toolQueue = nil
 }
 
-func (a *Agent) Reset() {
-	a.messages = []anthropic.MessageParam{}
+func (a *Agent) SetModel(provider LLMProvider, model string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.provider = provider
+	a.config.Model = model
+}
+
+func (a *Agent) GetModel() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.config.Model
 }

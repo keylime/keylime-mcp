@@ -381,6 +381,60 @@
             height: 20px;
         }
 
+        .input-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            gap: 12px;
+        }
+
+        .model-selector {
+            appearance: none;
+            -webkit-appearance: none;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 24px 4px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            max-width: 280px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236e7681' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            text-overflow: ellipsis;
+        }
+
+        .model-selector:hover {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+
+        .model-selector:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .model-selector option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .model-selector optgroup {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-style: normal;
+        }
+
+        .model-selector:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* Status indicator */
         .status {
             display: flex;
@@ -388,7 +442,6 @@
             gap: 6px;
             font-size: 12px;
             color: var(--text-muted);
-            margin-top: 8px;
         }
 
         .status-dot {
@@ -506,9 +559,14 @@
                     </button>
                 </div>
             </form>
-            <div class="status">
-                <div class="status-dot" id="status-dot"></div>
-                <span id="status-text">Connecting...</span>
+            <div class="input-footer">
+                <div class="status">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Connecting...</span>
+                </div>
+                <select class="model-selector" id="model-selector" disabled>
+                    <option value="">Loading models...</option>
+                </select>
             </div>
         </div>
     </div>
@@ -522,9 +580,107 @@
         const resetBtn = document.getElementById('reset-btn');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const modelSelector = document.getElementById('model-selector');
 
         let eventSource = null;
         let isProcessing = false;
+
+        const providerLabels = {
+            'anthropic': 'Anthropic (Claude)',
+            'ollama': 'Ollama (Local)'
+        };
+
+        async function loadModels() {
+            try {
+                const [modelsResp, currentResp] = await Promise.all([
+                    fetch('/api/models'),
+                    fetch('/api/model')
+                ]);
+                const data = await modelsResp.json();
+                const current = await currentResp.json();
+                const models = data.models || [];
+                const ollamaStatus = data.ollama_status || '';
+
+                modelSelector.innerHTML = '';
+
+                if (models.length === 0 && !ollamaStatus) {
+                    modelSelector.innerHTML = '<option value="">No models available</option>';
+                    return;
+                }
+
+                const grouped = {};
+                for (const m of models) {
+                    if (!grouped[m.provider]) grouped[m.provider] = [];
+                    grouped[m.provider].push(m);
+                }
+
+                for (const [provider, providerModels] of Object.entries(grouped)) {
+                    const group = document.createElement('optgroup');
+                    group.label = providerLabels[provider] || provider;
+                    for (const m of providerModels) {
+                        const opt = document.createElement('option');
+                        opt.value = JSON.stringify({ provider: m.provider, model: m.id });
+                        opt.textContent = m.display_name || m.id;
+                        if (m.id === current.model) opt.selected = true;
+                        group.appendChild(opt);
+                    }
+                    modelSelector.appendChild(group);
+                }
+
+                if (ollamaStatus === 'not_running') {
+                    const group = document.createElement('optgroup');
+                    group.label = 'Ollama — not running';
+                    const opt = document.createElement('option');
+                    opt.disabled = true;
+                    opt.textContent = 'run: ollama serve';
+                    group.appendChild(opt);
+                    modelSelector.appendChild(group);
+                } else if (ollamaStatus === 'not_installed') {
+                    const group = document.createElement('optgroup');
+                    group.label = 'Ollama — not installed';
+                    const opt = document.createElement('option');
+                    opt.disabled = true;
+                    opt.textContent = 'ollama.com/download';
+                    group.appendChild(opt);
+                    modelSelector.appendChild(group);
+                }
+
+                if (!modelSelector.querySelector('option[selected]')) {
+                    const first = modelSelector.querySelector('option:not([disabled])');
+                    if (first) first.selected = true;
+                }
+
+                modelSelector.disabled = false;
+            } catch (err) {
+                console.error('Failed to load models:', err);
+                modelSelector.innerHTML = '<option value="">Failed to load models</option>';
+            }
+        }
+
+        modelSelector.addEventListener('change', async () => {
+            const val = modelSelector.value;
+            if (!val) return;
+
+            try {
+                const { provider, model } = JSON.parse(val);
+                modelSelector.disabled = true;
+
+                const resp = await fetch('/api/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, model })
+                });
+
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    console.error('Failed to set model:', errText);
+                }
+            } catch (err) {
+                console.error('Failed to switch model:', err);
+            } finally {
+                modelSelector.disabled = false;
+            }
+        });
 
         // Auto-resize textarea
         messageInput.addEventListener('input', () => {
@@ -556,6 +712,7 @@
             eventSource.addEventListener('user-message', (e) => {
                 hideEmptyState();
                 appendHTML(e.data);
+                showLoading();
                 scrollToBottom();
             });
 
@@ -646,7 +803,6 @@
                 const formData = new FormData();
                 formData.append('message', message);
                 await fetch('/chat', { method: 'POST', body: formData });
-                showLoading();
             } catch (err) {
                 setProcessing(false);
                 console.error('Failed to send message:', err);
@@ -736,6 +892,7 @@
 
 
         connect();
+        loadModels();
     </script>
 </body>
 </html>

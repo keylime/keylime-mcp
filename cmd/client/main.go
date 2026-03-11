@@ -17,6 +17,7 @@ import (
 const (
 	defaultServerPath = "./server"
 	defaultPort       = "3000"
+	defaultOllamaURL  = "http://localhost:11434"
 	envFileLocation   = "./../.env"
 )
 
@@ -36,12 +37,6 @@ func main() {
 		log.Printf("Warning: .env file not loaded: %v", err)
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
-	if apiKey == "" {
-		log.Println("ANTHROPIC_API_KEY environment variable not set")
-		return
-	}
-
 	serverPath := os.Getenv("MCP_SERVER_PATH")
 	if serverPath == "" {
 		serverPath = defaultServerPath
@@ -58,10 +53,17 @@ func main() {
 		return
 	}
 
-	agentInstance := agent.NewAgent(agent.Config{
-		APIKey:     apiKey,
-		ServerPath: serverPath,
-	})
+	providers, initialProvider, initialModel := createProviders()
+
+	cfg := agent.Config{ServerPath: serverPath, Model: initialModel}
+	if cfg.Model == "" {
+		if models, err := initialProvider.ListModels(ctx); err == nil && len(models) > 0 {
+			cfg.Model = models[0].ID
+			log.Printf("Auto-selected model: %s", cfg.Model)
+		}
+	}
+
+	agentInstance := agent.NewAgent(cfg, initialProvider)
 
 	if err := agentInstance.Connect(ctx); err != nil {
 		log.Printf("Failed to connect to MCP server: %v", err)
@@ -75,7 +77,7 @@ func main() {
 		return
 	}
 
-	srv, err := web.NewServer(ctx, agentInstance)
+	srv, err := web.NewServer(ctx, agentInstance, providers)
 	if err != nil {
 		log.Printf("Failed to create web server: %v", err)
 		return
@@ -88,4 +90,37 @@ func main() {
 		log.Printf("Server error: %v", err)
 		return
 	}
+}
+
+func createProviders() ([]agent.LLMProvider, agent.LLMProvider, string) {
+	ollamaURL := os.Getenv("OLLAMA_URL")
+	ollamaModel := os.Getenv("OLLAMA_MODEL")
+	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+
+	if ollamaURL == "" {
+		ollamaURL = defaultOllamaURL
+	}
+
+	var providers []agent.LLMProvider
+
+	var claudeProvider *agent.AnthropicProvider
+	if apiKey != "" {
+		claudeProvider = agent.NewClaudeProvider(apiKey)
+		providers = append(providers, claudeProvider)
+	}
+
+	ollamaProvider := agent.NewOllamaProvider(ollamaURL)
+	providers = append(providers, ollamaProvider)
+
+	if ollamaModel != "" || os.Getenv("OLLAMA_URL") != "" {
+		log.Printf("Using Ollama provider at %s", ollamaURL)
+		return providers, ollamaProvider, ollamaModel
+	}
+
+	if claudeProvider == nil {
+		log.Fatal("Set ANTHROPIC_API_KEY for Claude or OLLAMA_URL/OLLAMA_MODEL for local Ollama")
+	}
+
+	log.Printf("Using Claude provider")
+	return providers, claudeProvider, ""
 }
