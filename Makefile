@@ -1,4 +1,4 @@
-.PHONY: help build up down logs clean ps setup-certs
+.PHONY: help build build-server run start check-deps setup-certs install
 
 PODMAN := $(shell command -v podman 2>/dev/null)
 
@@ -8,10 +8,17 @@ endif
 
 help:
 	@echo "Keylime MCP"
-	@echo "  make server      - Build MCP server binary"
-	@echo "  make client      - Build web client binary"
-	@echo "  make run         - Run web client locally"
-	@echo "  make setup-certs - Grant read access to Keylime certs (requires sudo)"
+	@echo ""
+	@echo "Setup:"
+	@echo "  make install      - Full setup (check deps, env, certs, build)"
+	@echo "  make check-deps   - Verify Go is installed and certs are readable"
+	@echo "  make setup-certs  - Grant read access to Keylime certs (requires sudo)"
+	@echo ""
+	@echo "Build & Run:"
+	@echo "  make build-server - Build MCP server binary"
+	@echo "  make build        - Build everything (server + client)"
+	@echo "  make run          - Build and run"
+	@echo "  make start        - Run pre-built binary (no compilation)"
 
 .env:
 	@if [ ! -f .env ]; then \
@@ -19,13 +26,16 @@ help:
 		echo "Created .env from .env.example"; \
 	fi
 
-server:
+build-server:
 	go build -o bin/server cmd/server/main.go
 
-client: server
+build: build-server
 	go build -o bin/client cmd/client/main.go
 
-run: .env server client
+run: .env build
+	cd bin/ && ./client
+
+start:
 	cd bin/ && ./client
 
 KEYLIME_CERT_DIR := /var/lib/keylime/cv_ca
@@ -39,5 +49,22 @@ setup-certs:
 		sudo setfacl -m u:$(USER):r $(KEYLIME_CERT_DIR)/$$f; \
 	done
 	@echo "Done. Certificate access granted."
+
+check-deps:
+	@echo "Checking dependencies..."
+	@command -v go >/dev/null 2>&1 || { echo "Go not found. Install: https://go.dev/dl/"; exit 1; }
+	@echo "  Go: $$(go version)"
+	@for f in $(CERT_FILES); do \
+		if [ ! -r $(KEYLIME_CERT_DIR)/$$f ]; then \
+			echo "  Certificate not readable: $(KEYLIME_CERT_DIR)/$$f"; \
+			echo "  Run 'make setup-certs' to fix."; \
+			exit 1; \
+		fi; \
+	done
+	@echo "  Certs: OK"
+	@echo "All dependencies satisfied."
+
+install: check-deps .env setup-certs build
+	@echo "Installation complete. Run 'make run' or 'make start'."
 
 # TODO Podman
