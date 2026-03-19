@@ -49,8 +49,8 @@ func NewServer(ctx context.Context, ag *agent.Agent, providers []agent.LLMProvid
 		agent:     ag,
 		providers: providers,
 		templates: tmpl,
-		clients: make(map[chan SSEvent]struct{}),
-		ctx:     ctx,
+		clients:   make(map[chan SSEvent]struct{}),
+		ctx:       ctx,
 	}, nil
 }
 
