@@ -41,7 +41,7 @@ func loadConfig() keylime.Config {
 		CertDir:        certDir,
 		TLSEnabled:     getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
 		IgnoreHostname: getEnv("KEYLIME_IGNORE_HOSTNAME", "true") == "true",
-		APIVersion:     getEnv("KEYLIME_API_VERSION", "v2.5"),
+		APIVersion:     getEnv("KEYLIME_API_VERSION", "v2.4"),
 		ClientCert:     getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),
 		ClientKey:      getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem"),
 		CAPath:         getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt"),

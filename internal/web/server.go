@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/keylime/keylime-mcp/internal/agent"
@@ -24,8 +25,11 @@ type Server struct {
 	agent     *agent.Agent
 	providers []agent.LLMProvider
 	templates *template.Template
-	eventChan chan SSEvent
 	ctx       context.Context
+
+	mu      sync.Mutex
+	clients map[chan SSEvent]struct{}
+	history []SSEvent
 }
 
 // SSEvent represents a Server-Sent Event
@@ -45,8 +49,8 @@ func NewServer(ctx context.Context, ag *agent.Agent, providers []agent.LLMProvid
 		agent:     ag,
 		providers: providers,
 		templates: tmpl,
-		eventChan: make(chan SSEvent, 100),
-		ctx:       ctx,
+		clients: make(map[chan SSEvent]struct{}),
+		ctx:     ctx,
 	}, nil
 }
 
@@ -222,6 +226,10 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 		Data:  "",
 	})
 
+	s.mu.Lock()
+	s.history = nil
+	s.mu.Unlock()
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -236,8 +244,26 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
+	ch := make(chan SSEvent, 100)
+	s.mu.Lock()
+	s.clients[ch] = struct{}{}
+	hist := make([]SSEvent, len(s.history))
+	copy(hist, s.history)
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		delete(s.clients, ch)
+		s.mu.Unlock()
+	}()
+
 	log.Printf("[SSE] Client connected")
 
+	fmt.Fprintf(w, "event: sync\ndata: \n\n")
+	for _, event := range hist {
+		data := strings.ReplaceAll(event.Data, "\n", "\\n")
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Event, data)
+	}
 	fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
@@ -246,7 +272,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			log.Printf("[SSE] Client disconnected")
 			return
-		case event := <-s.eventChan:
+		case event := <-ch:
 			data := strings.ReplaceAll(event.Data, "\n", "\\n")
 			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Event, data)
 			flusher.Flush()
@@ -258,11 +284,15 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) send(event SSEvent) {
-	select {
-	case s.eventChan <- event:
-		log.Printf("[SSE] Sent: %s", event.Event)
-	default:
-		log.Printf("[SSE] Channel full, dropping event: %s", event.Event)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.history = append(s.history, event)
+	for ch := range s.clients {
+		select {
+		case ch <- event:
+		default:
+			log.Printf("[SSE] Client channel full, dropping event: %s", event.Event)
+		}
 	}
 }
 

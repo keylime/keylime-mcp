@@ -705,6 +705,14 @@
             
             eventSource = new EventSource('/events');
 
+            eventSource.addEventListener('sync', () => {
+                Array.from(messagesEl.children).forEach(c => { if (c !== emptyState) c.remove(); });
+                hideLoading();
+                showEmptyState();
+                setProcessing(false);
+                setStatus('connected', 'Connected');
+            });
+
             eventSource.addEventListener('ping', () => {
                 setStatus('connected', 'Connected');
             });
@@ -777,7 +785,8 @@
             });
 
             eventSource.addEventListener('reset', () => {
-                messagesEl.innerHTML = '';
+                Array.from(messagesEl.children).forEach(c => { if (c !== emptyState) c.remove(); });
+                hideLoading();
                 showEmptyState();
                 setProcessing(false);
                 setStatus('connected', 'Connected');
