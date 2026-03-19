@@ -1,4 +1,4 @@
-.PHONY: help build build-server run start check-deps setup-certs install
+.PHONY: help build build-server run start check-deps setup-certs install clean
 
 PODMAN := $(shell command -v podman 2>/dev/null)
 
@@ -46,7 +46,7 @@ setup-certs:
 	@sudo setfacl -m u:$(USER):rx /var/lib/keylime
 	@sudo setfacl -m u:$(USER):rx $(KEYLIME_CERT_DIR)
 	@for f in $(CERT_FILES); do \
-		sudo setfacl -m u:$(USER):r $(KEYLIME_CERT_DIR)/$$f; \
+		sudo setfacl -m u:$(USER):r "$(KEYLIME_CERT_DIR)/$$f"; \
 	done
 	@echo "Done. Certificate access granted."
 
@@ -55,7 +55,7 @@ check-deps:
 	@command -v go >/dev/null 2>&1 || { echo "Go not found. Install: https://go.dev/dl/"; exit 1; }
 	@echo "  Go: $$(go version)"
 	@for f in $(CERT_FILES); do \
-		if [ ! -r $(KEYLIME_CERT_DIR)/$$f ]; then \
+		if [ ! -r "$(KEYLIME_CERT_DIR)/$$f" ]; then \
 			echo "  Certificate not readable: $(KEYLIME_CERT_DIR)/$$f"; \
 			echo "  Run 'make setup-certs' to fix."; \
 			exit 1; \
@@ -64,7 +64,8 @@ check-deps:
 	@echo "  Certs: OK"
 	@echo "All dependencies satisfied."
 
-install: check-deps .env setup-certs build
+install: setup-certs check-deps .env build
 	@echo "Installation complete. Run 'make run' or 'make start'."
 
-# TODO Podman
+clean:
+	rm -rf bin/*

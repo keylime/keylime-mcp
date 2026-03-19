@@ -284,9 +284,13 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) send(event SSEvent) {
+	const maxHistory = 1000
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.history = append(s.history, event)
+	if len(s.history) > maxHistory {
+		s.history = s.history[len(s.history)-maxHistory:]
+	}
 	for ch := range s.clients {
 		select {
 		case ch <- event:
