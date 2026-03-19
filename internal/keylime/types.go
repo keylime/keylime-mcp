@@ -41,9 +41,8 @@ func StateToString(state int) string {
 type Config struct {
 	VerifierURL    string
 	RegistrarURL   string
-	CertDir        string
-	TLSEnabled     bool
-	IgnoreHostname bool
+	CertDir       string
+	TLSServerName string
 
 	APIVersion string
 	ClientCert string

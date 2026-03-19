@@ -6,79 +6,67 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 )
 
 // newClient creates HTTP client for Keylime API with mTLS support
-func newClient(baseURL string, config *Config) *Client {
-	// Remove "http(s)://" prefix if present
+func newClient(baseURL string, config *Config) (*Client, error) {
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
 
 	var finalURL string
 	var httpClient *http.Client
 
-	if config.TLSEnabled {
-		finalURL = "https://" + strings.TrimSuffix(baseURL, "/")
-		tlsConfig := createTLSConfig(config)
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsConfig,
-			},
-		}
-	} else {
-		finalURL = "http://" + strings.TrimSuffix(baseURL, "/")
-		httpClient = &http.Client{}
+	finalURL = "https://" + strings.TrimSuffix(baseURL, "/")
+	tlsConfig, err := createTLSConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("TLS configuration failed: %w", err)
+	}
+	httpClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
 	}
 
 	return &Client{
 		baseURL:    finalURL,
 		apiVersion: config.APIVersion,
 		httpClient: httpClient,
-	}
+	}, nil
 }
 
 // createTLSConfig creates TLS configuration with mTLS support
-// Equivalent to Python's HostNameIgnoreAdapter with SSL context
-func createTLSConfig(config *Config) *tls.Config {
-	// Load client certificate and key
+func createTLSConfig(config *Config) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(config.ClientCert, config.ClientKey)
 	if err != nil {
-		log.Printf("Warning: Failed to load client certificate: %v", err)
-		log.Printf("Attempting to connect without client cert (may fail with mTLS servers)")
-		// Return basic TLS config without client cert
-		return &tls.Config{
-			InsecureSkipVerify: true, // #nosec G402 -- fallback when client cert fails, intentional for Keylime
-		}
+		return nil, fmt.Errorf("failed to load client certificate (%s, %s): %w", config.ClientCert, config.ClientKey, err)
 	}
 
-	// Load CA certificate
 	caCertPEM, err := os.ReadFile(config.CAPath)
 	if err != nil {
-		log.Printf("Warning: Failed to load CA certificate: %v", err)
-		log.Printf("Using system CA pool")
+		return nil, fmt.Errorf("failed to load CA certificate (%s): %w", config.CAPath, err)
 	}
 
-	// Create CA pool
 	caCertPool := x509.NewCertPool()
-	if caCertPEM != nil {
-		if !caCertPool.AppendCertsFromPEM(caCertPEM) {
-			log.Printf("Warning: Failed to append CA certificate to pool")
-		}
+	if !caCertPool.AppendCertsFromPEM(caCertPEM) {
+		return nil, fmt.Errorf("failed to parse CA certificate from %s", config.CAPath)
 	}
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
-		// Ignore hostname verification (like Python's HostNameIgnoreAdapter)
-		// This is needed because Keylime certs often don't have correct hostname
-		InsecureSkipVerify: config.IgnoreHostname, // #nosec G402 -- Keylime certs often lack correct hostname
 	}
 
-	return tlsConfig
+	// Keylime certs use a generic CN/SAN (default "server") that won't match
+	// the connection hostname. ServerName tells Go which name to verify the
+	// certificate against, so full chain + hostname verification still runs.
+	if config.TLSServerName != "" {
+		tlsConfig.ServerName = config.TLSServerName
+	}
+
+	return tlsConfig, nil
 }
 
 func (kc *Client) Get(endpoint string) (*http.Response, error) {
