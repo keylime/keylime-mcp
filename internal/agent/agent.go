@@ -264,3 +264,12 @@ func (a *Agent) GetModel() string {
 	defer a.mu.Unlock()
 	return a.config.Model
 }
+
+func (a *Agent) GetProvider() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.provider == nil {
+		return ""
+	}
+	return a.provider.Name()
+}

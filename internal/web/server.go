@@ -330,7 +330,7 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetModel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]string{"model": s.agent.GetModel()}
+	resp := map[string]string{"model": s.agent.GetModel(), "provider": s.agent.GetProvider()}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] Failed to encode model response: %v", err)
 	}

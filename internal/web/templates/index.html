@@ -614,6 +614,7 @@
                     grouped[m.provider].push(m);
                 }
 
+                let foundCurrent = false;
                 for (const [provider, providerModels] of Object.entries(grouped)) {
                     const group = document.createElement('optgroup');
                     group.label = providerLabels[provider] || provider;
@@ -621,7 +622,10 @@
                         const opt = document.createElement('option');
                         opt.value = JSON.stringify({ provider: m.provider, model: m.id });
                         opt.textContent = m.display_name || m.id;
-                        if (m.id === current.model) opt.selected = true;
+                        if (m.id === current.model && m.provider === current.provider) {
+                            opt.selected = true;
+                            foundCurrent = true;
+                        }
                         group.appendChild(opt);
                     }
                     modelSelector.appendChild(group);
@@ -645,7 +649,7 @@
                     modelSelector.appendChild(group);
                 }
 
-                if (!modelSelector.querySelector('option[selected]')) {
+                if (!foundCurrent) {
                     const first = modelSelector.querySelector('option:not([disabled])');
                     if (first) first.selected = true;
                 }

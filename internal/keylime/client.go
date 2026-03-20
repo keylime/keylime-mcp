@@ -52,9 +52,6 @@ func createTLSConfig(config *Config) (*tls.Config, error) {
 		RootCAs:      caCertPool,
 	}
 
-	// Keylime certs use a generic CN/SAN (default "server") that won't match
-	// the connection hostname. ServerName tells Go which name to verify the
-	// certificate against, so full chain + hostname verification still runs.
 	if config.TLSServerName != "" {
 		tlsConfig.ServerName = config.TLSServerName
 	}
