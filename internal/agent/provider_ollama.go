@@ -39,7 +39,7 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		return nil, fmt.Errorf("failed to create Ollama request: %w", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // baseURL is from server config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("failed to reach Ollama at %s: %w", p.baseURL, err)
 	}

@@ -120,15 +120,15 @@ func MapAgentToPolicies(agentUUID string, agentStatus AgentStatusResponse) GetAg
 }
 
 // parseJSONString converts a JSON string into a proper Go interface
-func parseJSONString(jsonStr string) interface{} {
+func parseJSONString(jsonStr string) any {
 	if jsonStr == "" {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	var result interface{}
+	var result any
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		log.Printf("Warning: Invalid JSON string: %v", err)
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
 	return result

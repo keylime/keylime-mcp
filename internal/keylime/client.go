@@ -16,24 +16,17 @@ func newClient(baseURL string, config *Config) (*Client, error) {
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
 
-	var finalURL string
-	var httpClient *http.Client
-
-	finalURL = "https://" + strings.TrimSuffix(baseURL, "/")
 	tlsConfig, err := createTLSConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("TLS configuration failed: %w", err)
 	}
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
 
 	return &Client{
-		baseURL:    finalURL,
+		baseURL:    "https://" + strings.TrimSuffix(baseURL, "/"),
 		apiVersion: config.APIVersion,
-		httpClient: httpClient,
+		httpClient: &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		},
 	}, nil
 }
 
@@ -74,7 +67,7 @@ func (kc *Client) Get(endpoint string) (*http.Response, error) {
 	return kc.httpClient.Get(url) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *Client) doRequestWithBody(method, endpoint string, body interface{}) (*http.Response, error) {
+func (kc *Client) doRequestWithBody(method, endpoint string, body any) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
 	var buf bytes.Buffer
 	if body != nil {
@@ -90,11 +83,11 @@ func (kc *Client) doRequestWithBody(method, endpoint string, body interface{}) (
 	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *Client) Post(endpoint string, body interface{}) (*http.Response, error) {
+func (kc *Client) Post(endpoint string, body any) (*http.Response, error) {
 	return kc.doRequestWithBody("POST", endpoint, body)
 }
 
-func (kc *Client) Put(endpoint string, body interface{}) (*http.Response, error) {
+func (kc *Client) Put(endpoint string, body any) (*http.Response, error) {
 	return kc.doRequestWithBody("PUT", endpoint, body)
 }
 

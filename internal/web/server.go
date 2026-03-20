@@ -370,7 +370,7 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderMessage(role, content, toolID string, tool *agent.ToolRequest) string {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Role":    role,
 		"Content": content,
 		"ToolID":  toolID,
@@ -392,7 +392,7 @@ func (s *Server) renderMessage(role, content, toolID string, tool *agent.ToolReq
 }
 
 func (s *Server) renderToolResult(toolID, content string) string {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"ToolID":  toolID,
 		"Content": content,
 	}
