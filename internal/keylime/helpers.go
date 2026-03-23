@@ -13,11 +13,19 @@ type Service struct {
 }
 
 // NewService creates a new Keylime service with configured clients
-func NewService(config *Config) *Service {
-	return &Service{
-		Verifier:  newClient(config.VerifierURL, config),
-		Registrar: newClient(config.RegistrarURL, config),
+func NewService(config *Config) (*Service, error) {
+	verifier, err := newClient(config.VerifierURL, config)
+	if err != nil {
+		return nil, fmt.Errorf("verifier client: %w", err)
 	}
+	registrar, err := newClient(config.RegistrarURL, config)
+	if err != nil {
+		return nil, fmt.Errorf("registrar client: %w", err)
+	}
+	return &Service{
+		Verifier:  verifier,
+		Registrar: registrar,
+	}, nil
 }
 
 // FetchAllAgentUUIDs retrieves list of all registered agent UUIDs from registrar
@@ -112,15 +120,15 @@ func MapAgentToPolicies(agentUUID string, agentStatus AgentStatusResponse) GetAg
 }
 
 // parseJSONString converts a JSON string into a proper Go interface
-func parseJSONString(jsonStr string) interface{} {
+func parseJSONString(jsonStr string) any {
 	if jsonStr == "" {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	var result interface{}
+	var result any
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		log.Printf("Warning: Invalid JSON string: %v", err)
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
 	return result

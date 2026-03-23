@@ -39,11 +39,11 @@ func StateToString(state int) string {
 }
 
 type Config struct {
-	VerifierURL    string
-	RegistrarURL   string
-	CertDir        string
-	TLSEnabled     bool
-	IgnoreHostname bool
+	VerifierURL   string
+	RegistrarURL  string
+	CertDir       string
+	TLSEnabled    bool
+	TLSServerName string
 
 	APIVersion string
 	ClientCert string
@@ -145,13 +145,13 @@ type GetAgentPoliciesInput struct {
 }
 
 type GetAgentPoliciesOutput struct {
-	AgentUUID                 string      `json:"agent_uuid"`
-	TPMPolicy                 interface{} `json:"tpm_policy"`
-	VTPMPolicy                interface{} `json:"vtpm_policy"`
-	MetaData                  interface{} `json:"meta_data"`
-	HasMeasuredBootPolicy     bool        `json:"has_measured_boot_policy"`
-	HasRuntimePolicy          bool        `json:"has_runtime_policy"`
-	AcceptedTPMHashAlgs       []string    `json:"accepted_tpm_hash_algs"`
-	AcceptedTPMEncryptionAlgs []string    `json:"accepted_tpm_encryption_algs"`
-	AcceptedTPMSigningAlgs    []string    `json:"accepted_tpm_signing_algs"`
+	AgentUUID                 string   `json:"agent_uuid"`
+	TPMPolicy                 any      `json:"tpm_policy"`
+	VTPMPolicy                any      `json:"vtpm_policy"`
+	MetaData                  any      `json:"meta_data"`
+	HasMeasuredBootPolicy     bool     `json:"has_measured_boot_policy"`
+	HasRuntimePolicy          bool     `json:"has_runtime_policy"`
+	AcceptedTPMHashAlgs       []string `json:"accepted_tpm_hash_algs"`
+	AcceptedTPMEncryptionAlgs []string `json:"accepted_tpm_encryption_algs"`
+	AcceptedTPMSigningAlgs    []string `json:"accepted_tpm_signing_algs"`
 }

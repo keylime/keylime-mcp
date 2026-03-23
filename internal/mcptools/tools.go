@@ -20,12 +20,12 @@ func NewToolHandler(service *keylime.Service) *ToolHandler {
 
 func (h *ToolHandler) GetAllAgents(ctx context.Context, req *mcp.CallToolRequest, _ keylime.GetAllAgentsInput) (
 	*mcp.CallToolResult,
-	keylime.GetAllAgentsOutput,
+	any,
 	error,
 ) {
 	uuids, err := h.service.FetchAllAgentUUIDs()
 	if err != nil {
-		return nil, keylime.GetAllAgentsOutput{}, err
+		return nil, nil, err
 	}
 
 	return nil, keylime.GetAllAgentsOutput{Agents: uuids}, nil
@@ -33,12 +33,12 @@ func (h *ToolHandler) GetAllAgents(ctx context.Context, req *mcp.CallToolRequest
 
 func (h *ToolHandler) GetAgentStatus(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentStatusInput) (
 	*mcp.CallToolResult,
-	keylime.GetAgentStatusOutput,
+	any,
 	error,
 ) {
 	agentStatus, err := h.service.FetchAgentDetails(input.AgentUUID)
 	if err != nil {
-		return nil, keylime.GetAgentStatusOutput{}, err
+		return nil, nil, err
 	}
 
 	return nil, keylime.MapAgentToOutput(input.AgentUUID, agentStatus), nil
@@ -46,12 +46,12 @@ func (h *ToolHandler) GetAgentStatus(ctx context.Context, req *mcp.CallToolReque
 
 func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetFailedAgentsInput) (
 	*mcp.CallToolResult,
-	keylime.GetFailedAgentsOutput,
+	any,
 	error,
 ) {
 	uuids, err := h.service.FetchAllAgentUUIDs()
 	if err != nil {
-		return nil, keylime.GetFailedAgentsOutput{}, err
+		return nil, nil, err
 	}
 
 	failedAgents := keylime.GetFailedAgentsOutput{
@@ -60,7 +60,7 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 	for _, agentUUID := range uuids {
 		agentStatus, err := h.service.FetchAgentDetails(agentUUID)
 		if err != nil {
-			return nil, keylime.GetFailedAgentsOutput{}, err
+			return nil, nil, err
 		}
 
 		if agentStatus.Results.OperationalState == keylime.StateFailed {
@@ -73,14 +73,14 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 
 func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.ReactivateAgentInput) (
 	*mcp.CallToolResult,
-	keylime.ReactivateAgentOutput,
+	any,
 	error,
 ) {
 	endpoint := fmt.Sprintf("agents/%s/reactivate", input.AgentUUID)
 	resp, err := h.service.Verifier.Put(endpoint, nil)
 	if err != nil {
 		log.Printf("Error reactivating agent: %v", err)
-		return nil, keylime.ReactivateAgentOutput{}, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
@@ -88,7 +88,7 @@ func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequ
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		log.Printf("Error decoding response: %v", err)
-		return nil, keylime.ReactivateAgentOutput{}, err
+		return nil, nil, err
 	}
 
 	return nil, response, nil
@@ -96,12 +96,12 @@ func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequ
 
 func (h *ToolHandler) AgentPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentPoliciesInput) (
 	*mcp.CallToolResult,
-	keylime.GetAgentPoliciesOutput,
+	any,
 	error,
 ) {
 	agentDetails, err := h.service.FetchAgentDetails(input.AgentUUID)
 	if err != nil {
-		return nil, keylime.GetAgentPoliciesOutput{}, err
+		return nil, nil, err
 	}
 	return nil, keylime.MapAgentToPolicies(input.AgentUUID, agentDetails), nil
 }

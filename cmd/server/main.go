@@ -18,7 +18,10 @@ func main() {
 		log.Printf("No .env file found, using defaults")
 	}
 	config := loadConfig()
-	keylimeService := keylime.NewService(&config)
+	keylimeService, err := keylime.NewService(&config)
+	if err != nil {
+		log.Fatalf("Failed to initialize Keylime service: %v", err)
+	}
 	toolHandler := mcptools.NewToolHandler(keylimeService)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "Keylime", Version: "v1.0.0"}, nil)
@@ -36,16 +39,16 @@ func loadConfig() keylime.Config {
 	certDir := getEnv("KEYLIME_CERT_DIR", "/var/lib/keylime/cv_ca")
 
 	return keylime.Config{
-		VerifierURL:    getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881"),
-		RegistrarURL:   getEnv("KEYLIME_REGISTRAR_URL", "https://localhost:8891"),
-		CertDir:        certDir,
-		TLSEnabled:     getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
-		IgnoreHostname: getEnv("KEYLIME_IGNORE_HOSTNAME", "true") == "true",
-		APIVersion:     getEnv("KEYLIME_API_VERSION", "v2.3"),
-		ClientCert:     getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),
-		ClientKey:      getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem"),
-		CAPath:         getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt"),
-		Port:           getEnv("PORT", "8080"),
+		VerifierURL:   getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881"),
+		RegistrarURL:  getEnv("KEYLIME_REGISTRAR_URL", "https://localhost:8891"),
+		CertDir:       certDir,
+		TLSEnabled:    getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
+		TLSServerName: getEnv("KEYLIME_TLS_SERVER_NAME", "server"),
+		APIVersion:    getEnv("KEYLIME_API_VERSION", "v2.4"),
+		ClientCert:    getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),
+		ClientKey:     getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem"),
+		CAPath:        getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt"),
+		Port:          getEnv("PORT", "8080"),
 	}
 }
 

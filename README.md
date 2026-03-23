@@ -19,10 +19,10 @@ There are two ways to use this MCP server:
 
 Build the server:
 ```bash
-make server
+make build-server
 ```
 
-You can move the binary anywhere you want (e.g., `/usr/local/bin/server).
+You can move the binary anywhere you want (e.g., `/usr/local/bin/server`).
 
 Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.json`):
 ```json
@@ -53,9 +53,13 @@ Access at http://localhost:3000
 
 ## Commands
 
-- `make server` - Build mcp server binary
-- `make client` - Build web client binary
-- `make run` - Run web client locally 
+- `make install` - Full setup (check deps, env, certs, build)
+- `make check-deps` - Verify Go is installed and certs are readable
+- `make setup-certs` - Grant read access to Keylime certs (requires sudo)
+- `make build-server` - Build MCP server binary
+- `make build` - Build everything (server + client)
+- `make run` - Build and run
+- `make start` - Run pre-built binary (no compilation)
 
 
 ## About Keylime

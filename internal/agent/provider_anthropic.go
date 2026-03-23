@@ -130,7 +130,7 @@ func convertMCPToolToAnthropic(tool *mcp.Tool) anthropic.ToolUnionParam {
 	}
 
 	var required []string
-	if r, ok := inputSchemaMap["required"].([]interface{}); ok {
+	if r, ok := inputSchemaMap["required"].([]any); ok {
 		for _, v := range r {
 			if s, ok := v.(string); ok {
 				required = append(required, s)

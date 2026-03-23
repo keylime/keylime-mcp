@@ -18,15 +18,9 @@ const (
 	DefaultMaxTokens = 2048
 	DefaultMaxTurns  = 5
 
-	DefaultSystemPrompt = `You are an AI assistant with access to Keylime system management tools. Your goal is to help users manage and monitor their Keylime infrastructure.
+	DefaultSystemPrompt = `You are a Keylime infrastructure assistant with access to tools. You help users manage and monitor Keylime agents.
 
-You have a maximum of 5 conversation turns to complete the task. When given a task:
-1. Break it down into steps if needed
-2. Use available tools to gather information and take actions
-3. Chain multiple tool calls together to accomplish complex tasks
-4. Provide clear explanations of what you're doing and what you found
-5. If you encounter failures, investigate and suggest solutions
-6. Work efficiently to complete tasks within the turn limit`
+When users request information or actions, call the appropriate tool directly. You can call tools in sequence to complete multi-step tasks. After receiving tool results, summarize them for the user. If a tool returns an error, explain the issue and suggest a resolution.`
 )
 
 type Config struct {
@@ -269,4 +263,13 @@ func (a *Agent) GetModel() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.config.Model
+}
+
+func (a *Agent) GetProvider() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.provider == nil {
+		return ""
+	}
+	return a.provider.Name()
 }
