@@ -42,6 +42,7 @@ type Config struct {
 	VerifierURL   string
 	RegistrarURL  string
 	CertDir       string
+	TLSEnabled    bool
 	TLSServerName string
 
 	APIVersion string

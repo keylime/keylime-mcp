@@ -42,6 +42,7 @@ func loadConfig() keylime.Config {
 		VerifierURL:   getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881"),
 		RegistrarURL:  getEnv("KEYLIME_REGISTRAR_URL", "https://localhost:8891"),
 		CertDir:       certDir,
+		TLSEnabled:    getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
 		TLSServerName: getEnv("KEYLIME_TLS_SERVER_NAME", "server"),
 		APIVersion:    getEnv("KEYLIME_API_VERSION", "v2.4"),
 		ClientCert:    getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),

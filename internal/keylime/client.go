@@ -9,12 +9,21 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // newClient creates HTTP client for Keylime API with mTLS support
 func newClient(baseURL string, config *Config) (*Client, error) {
 	baseURL = strings.TrimPrefix(baseURL, "https://")
 	baseURL = strings.TrimPrefix(baseURL, "http://")
+
+	if !config.TLSEnabled {
+		return &Client{
+			baseURL:    "http://" + strings.TrimSuffix(baseURL, "/"),
+			apiVersion: config.APIVersion,
+			httpClient: &http.Client{Timeout: 30 * time.Second},
+		}, nil
+	}
 
 	tlsConfig, err := createTLSConfig(config)
 	if err != nil {
@@ -26,6 +35,7 @@ func newClient(baseURL string, config *Config) (*Client, error) {
 		apiVersion: config.APIVersion,
 		httpClient: &http.Client{
 			Transport: &http.Transport{TLSClientConfig: tlsConfig},
+			Timeout:   30 * time.Second,
 		},
 	}, nil
 }
