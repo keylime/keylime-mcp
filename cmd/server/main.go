@@ -30,6 +30,9 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_failed_agents", Description: "Retrieves all agents currently in a failed operational state with their detailed status information including attestation history and failure reasons"}, toolHandler.GetFailedAgents)
 	mcp.AddTool(server, &mcp.Tool{Name: "Reactivate_agent", Description: "Reactivates a failed agent identified by its UUID"}, toolHandler.ReactivateAgent)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_agent_policies", Description: "Retrieves policy configuration (TPM, vTPM, runtime policies) for a specific agent"}, toolHandler.AgentPolicies)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_agent_details", Description: "Retrieves agent details from the registrar (EK certificate, AIK, ip and port)"}, toolHandler.RegistrarGetAgentDetails)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_version", Description: "Retrieves current and supported API keylime versions"}, toolHandler.GetAgentVersion)
+
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}

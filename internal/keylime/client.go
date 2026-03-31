@@ -106,3 +106,8 @@ func (kc *Client) Delete(endpoint string) (*http.Response, error) {
 	}
 	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
+
+func (kc *Client) GetRaw(path string) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", kc.baseURL, strings.TrimPrefix(path, "/"))
+	return kc.httpClient.Get(url)
+}

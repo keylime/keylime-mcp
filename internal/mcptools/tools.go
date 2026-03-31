@@ -105,3 +105,73 @@ func (h *ToolHandler) AgentPolicies(ctx context.Context, req *mcp.CallToolReques
 	}
 	return nil, keylime.MapAgentToPolicies(input.AgentUUID, agentDetails), nil
 }
+
+func (h *ToolHandler) RegistrarGetAgentDetails(ctx context.Context, req *mcp.CallToolRequest, input keylime.RegistrarGetAgentDetailsInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
+	resp, err := h.service.Registrar.Get(endpoint)
+	if err != nil {
+		log.Printf("Error getting agent details: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.RegistrarGetAgentDetailsOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+
+}
+
+func (h *ToolHandler) GetAgentVersion(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentVersionInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := "version"
+	resp, err := h.service.Registrar.GetRaw(endpoint)
+	if err != nil {
+		log.Printf("Error getting agent version: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.GetAgentVersionOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) RegistrarRemoveAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.RegistrarRemoveAgentInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
+	resp, err := h.service.Registrar.Delete(endpoint)
+	if err != nil {
+		log.Printf("Error getting agent version: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.RegistrarRemoveAgentOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}

@@ -155,3 +155,42 @@ type GetAgentPoliciesOutput struct {
 	AcceptedTPMEncryptionAlgs []string `json:"accepted_tpm_encryption_algs"`
 	AcceptedTPMSigningAlgs    []string `json:"accepted_tpm_signing_algs"`
 }
+
+type RegistrarGetAgentDetailsInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type RegistrarGetAgentDetailsOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		AikTpm   string `json:"aik_tpm"`
+		EkTpm    string `json:"ek_tpm"`
+		Ekcert   string `json:"ekcert"`
+		MtlsCert string `json:"mtls_cert"`
+		IP       string `json:"ip"`
+		Port     int    `json:"port"`
+		Regcount int    `json:"regcount"`
+	} `json:"results"`
+}
+
+type GetAgentVersionInput struct{}
+
+type GetAgentVersionOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		CurrentVersion    string   `json:"current_version"`
+		SupportedVersions []string `json:"supported_versions"`
+	} `json:"results"`
+}
+
+type RegistrarRemoveAgentInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type RegistrarRemoveAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
