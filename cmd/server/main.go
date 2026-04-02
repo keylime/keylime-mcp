@@ -35,6 +35,9 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Registrar_remove_agent", Description: "Removes an agent from the registrar (NOT the verifier)"}, toolHandler.RegistrarRemoveAgent)
 	mcp.AddTool(server, &mcp.Tool{Name: "Enroll_agent_to_verifier", Description: "Enrolls a registered agent into the verifier for active attestation"}, toolHandler.EnrollAgentToVerifier)
 	mcp.AddTool(server, &mcp.Tool{Name: "Unenroll_agent_from_verifier", Description: "Unenrolls an agent from the verifier (NOT the registrar)"}, toolHandler.UnenrollAgentFromVerifier)
+	mcp.AddTool(server, &mcp.Tool{Name: "Stop_agent", Description: "Stop Verifier pooling on an agent identified by its UUID, but does not remove the agent"}, toolHandler.StopAgent)
+	mcp.AddTool(server, &mcp.Tool{Name: "List_runtime_policies", Description: "Lists all runtime policies stored on the verifier"}, toolHandler.ListRuntimePolicies)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_runtime_policy", Description: "Gets a specific runtime policy"}, toolHandler.GetRuntimePolicy)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)

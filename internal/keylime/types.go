@@ -214,3 +214,37 @@ type UnenrollAgentFromVerifierOutput struct {
 	Status  string   `json:"status"`
 	Results struct{} `json:"results"`
 }
+
+type StopAgentInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type StopAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type ListRuntimePoliciesInput struct{}
+
+type ListRuntimePoliciesOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		RuntimePolicyNames []string `json:"runtimepolicy names"`
+	} `json:"results"`
+}
+
+type GetRuntimePolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type GetRuntimePolicyOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		Name          string `json:"name"`
+		TPMPolicy     string `json:"tpm_policy"`
+		RuntimePolicy string `json:"runtime_policy"`
+	} `json:"results"`
+}

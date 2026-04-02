@@ -72,29 +72,6 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 	return nil, failedAgents, nil
 }
 
-func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.ReactivateAgentInput) (
-	*mcp.CallToolResult,
-	any,
-	error,
-) {
-	endpoint := fmt.Sprintf("agents/%s/reactivate", input.AgentUUID)
-	resp, err := h.service.Verifier.Put(endpoint, nil)
-	if err != nil {
-		log.Printf("Error reactivating agent: %v", err)
-		return nil, nil, err
-	}
-	defer resp.Body.Close()
-
-	var response keylime.ReactivateAgentOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
-}
-
 func (h *ToolHandler) AgentPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentPoliciesInput) (
 	*mcp.CallToolResult,
 	any,
@@ -249,6 +226,98 @@ func (h *ToolHandler) UnenrollAgentFromVerifier(ctx context.Context, req *mcp.Ca
 	defer resp.Body.Close()
 
 	var response keylime.UnenrollAgentFromVerifierOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.ReactivateAgentInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("agents/%s/reactivate", input.AgentUUID)
+	resp, err := h.service.Verifier.Put(endpoint, nil)
+	if err != nil {
+		log.Printf("Error reactivating agent: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.ReactivateAgentOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) StopAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.StopAgentInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("agents/%s/stop", input.AgentUUID)
+	resp, err := h.service.Verifier.Put(endpoint, nil)
+	if err != nil {
+		log.Printf("Error stopping agent: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.StopAgentOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) ListRuntimePolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.ListRuntimePoliciesInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := "allowlists"
+	resp, err := h.service.Verifier.Get(endpoint)
+	if err != nil {
+		log.Printf("Error listing runtime policies: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.ListRuntimePoliciesOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) GetRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetRuntimePolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("allowlists/%s", input.PolicyName)
+	resp, err := h.service.Verifier.Get(endpoint)
+	if err != nil {
+		log.Printf("Error getting runtime policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.GetRuntimePolicyOutput
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		log.Printf("Error decoding response: %v", err)
