@@ -28,6 +28,10 @@ func NewService(config *Config) (*Service, error) {
 	}, nil
 }
 
+func IsFailedState(state int) bool {
+	return state == StateFailed || state == StateInvalidQuote || state == StateTenantFailed
+}
+
 // FetchAllAgentUUIDs retrieves list of all registered agent UUIDs from registrar
 func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
 	resp, err := s.Registrar.Get("agents")
@@ -70,66 +74,4 @@ func (s *Service) FetchAgentDetails(agentUUID string) (AgentStatusResponse, erro
 	return agentStatus, nil
 }
 
-// MapAgentToOutput converts API response to standardized output format
-func MapAgentToOutput(agentUUID string, agentStatus AgentStatusResponse) GetAgentStatusOutput {
-	return GetAgentStatusOutput{
-		AgentUUID:                   agentUUID,
-		OperationalState:            agentStatus.Results.OperationalState,
-		OperationalStateDescription: StateToString(agentStatus.Results.OperationalState),
-		AttestationCount:            agentStatus.Results.AttestationCount,
-		LastReceivedQuote:           agentStatus.Results.LastReceivedQuote,
-		LastSuccessfulAttestation:   agentStatus.Results.LastSuccessfulAttestation,
-		SeverityLevel:               agentStatus.Results.SeverityLevel,
-		LastEventID:                 agentStatus.Results.LastEventID,
-		HashAlgorithm:               agentStatus.Results.HashAlg,
-		EncryptionAlgorithm:         agentStatus.Results.EncAlg,
-		SigningAlgorithm:            agentStatus.Results.SignAlg,
-		VerifierID:                  agentStatus.Results.VerifierID,
-		VerifierAddress:             fmt.Sprintf("%s:%d", agentStatus.Results.VerifierIP, agentStatus.Results.VerifierPort),
-		HasMeasuredBoot:             agentStatus.Results.HasMbRefstate != 0,
-		HasRuntimePolicy:            agentStatus.Results.HasRuntimePolicy != 0,
-	}
-}
 
-func MapAgentToPolicies(agentUUID string, agentStatus AgentStatusResponse) GetAgentPoliciesOutput {
-	// Ensure slices are never nil
-	hashAlgs := agentStatus.Results.AcceptTPMHashAlgs
-	if hashAlgs == nil {
-		hashAlgs = []string{}
-	}
-	encAlgs := agentStatus.Results.AcceptTPMEncryptionAlgs
-	if encAlgs == nil {
-		encAlgs = []string{}
-	}
-	signAlgs := agentStatus.Results.AcceptTPMSigningAlgs
-	if signAlgs == nil {
-		signAlgs = []string{}
-	}
-
-	return GetAgentPoliciesOutput{
-		AgentUUID:                 agentUUID,
-		TPMPolicy:                 parseJSONString(agentStatus.Results.TPMPolicy),
-		VTPMPolicy:                parseJSONString(agentStatus.Results.VTPMPolicy),
-		MetaData:                  parseJSONString(agentStatus.Results.MetaData),
-		HasMeasuredBootPolicy:     agentStatus.Results.HasMbRefstate != 0,
-		HasRuntimePolicy:          agentStatus.Results.HasRuntimePolicy != 0,
-		AcceptedTPMHashAlgs:       hashAlgs,
-		AcceptedTPMEncryptionAlgs: encAlgs,
-		AcceptedTPMSigningAlgs:    signAlgs,
-	}
-}
-
-// parseJSONString converts a JSON string into a proper Go interface
-func parseJSONString(jsonStr string) any {
-	if jsonStr == "" {
-		return map[string]any{}
-	}
-
-	var result any
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		log.Printf("Warning: Invalid JSON string: %v", err)
-		return map[string]any{}
-	}
-
-	return result
-}

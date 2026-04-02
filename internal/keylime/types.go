@@ -196,7 +196,9 @@ type RegistrarRemoveAgentOutput struct {
 }
 
 type EnrollAgentToVerifierInput struct {
-	AgentUUID string `json:"agent_uuid"`
+	AgentUUID         string `json:"agent_uuid"`
+	RuntimePolicyName string `json:"runtime_policy_name"`
+	MbPolicyName      string `json:"mb_policy_name"`
 }
 
 type EnrollAgentToVerifierOutput struct {
@@ -223,6 +225,12 @@ type StopAgentOutput struct {
 	Code    int      `json:"code"`
 	Status  string   `json:"status"`
 	Results struct{} `json:"results"`
+}
+
+type GetVerifierEnrolledAgentsInput struct{}
+
+type GetVerifierEnrolledAgentsOutput struct {
+	Agents []string `json:"agents"`
 }
 
 type ListRuntimePoliciesInput struct{}
