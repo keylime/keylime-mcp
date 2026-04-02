@@ -54,7 +54,7 @@ type Config struct {
 
 type Client struct {
 	baseURL    string
-	apiVersion string
+	APIVersion string
 	httpClient *http.Client
 }
 
@@ -190,6 +190,26 @@ type RegistrarRemoveAgentInput struct {
 }
 
 type RegistrarRemoveAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type EnrollAgentToVerifierInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type EnrollAgentToVerifierOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type UnenrollAgentFromVerifierInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type UnenrollAgentFromVerifierOutput struct {
 	Code    int      `json:"code"`
 	Status  string   `json:"status"`
 	Results struct{} `json:"results"`

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -161,12 +162,93 @@ func (h *ToolHandler) RegistrarRemoveAgent(ctx context.Context, req *mcp.CallToo
 	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
 	resp, err := h.service.Registrar.Delete(endpoint)
 	if err != nil {
-		log.Printf("Error getting agent version: %v", err)
+		log.Printf("Error removing agent from registrar: %v", err)
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	var response keylime.RegistrarRemoveAgentOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) EnrollAgentToVerifier(ctx context.Context, req *mcp.CallToolRequest, input keylime.EnrollAgentToVerifierInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	regEndpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
+	regResp, err := h.service.Registrar.Get(regEndpoint)
+	if err != nil {
+		log.Printf("Error fetching agent details: %v", err)
+		return nil, nil, err
+	}
+	defer regResp.Body.Close()
+
+	var regDetails keylime.RegistrarGetAgentDetailsOutput
+	if err := json.NewDecoder(regResp.Body).Decode(&regDetails); err != nil {
+		log.Printf("Error decoding registrar response: %v", err)
+		return nil, nil, err
+	}
+
+	body := map[string]any{
+		"v":                          nil,
+		"cloudagent_ip":              regDetails.Results.IP,
+		"cloudagent_port":            regDetails.Results.Port,
+		"tpm_policy":                 "{}",
+		"runtime_policy":             "",
+		"runtime_policy_name":        "",
+		"runtime_policy_key":         "",
+		"mb_policy":                  "",
+		"mb_policy_name":             "",
+		"ima_sign_verification_keys": "",
+		"metadata":                   "{}",
+		"revocation_key":             "",
+		"accept_tpm_hash_algs":       []string{"sha256", "sha384", "sha512"},
+		"accept_tpm_encryption_algs": []string{"rsa"},
+		"accept_tpm_signing_algs":    []string{"rsassa"},
+		"ak_tpm":                     regDetails.Results.AikTpm,
+		"mtls_cert":                  regDetails.Results.MtlsCert,
+		"supported_version":          strings.TrimPrefix(h.service.Verifier.APIVersion, "v"),
+	}
+
+	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
+	resp, err := h.service.Verifier.Post(endpoint, body)
+	if err != nil {
+		log.Printf("Error enrolling agent to verifier: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.EnrollAgentToVerifierOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) UnenrollAgentFromVerifier(ctx context.Context, req *mcp.CallToolRequest, input keylime.UnenrollAgentFromVerifierInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
+	resp, err := h.service.Verifier.Delete(endpoint)
+	if err != nil {
+		log.Printf("Error removing agent from verifier: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.UnenrollAgentFromVerifierOutput
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		log.Printf("Error decoding response: %v", err)

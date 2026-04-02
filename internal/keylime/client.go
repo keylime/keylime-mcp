@@ -20,7 +20,7 @@ func newClient(baseURL string, config *Config) (*Client, error) {
 	if !config.TLSEnabled {
 		return &Client{
 			baseURL:    "http://" + strings.TrimSuffix(baseURL, "/"),
-			apiVersion: config.APIVersion,
+			APIVersion: config.APIVersion,
 			httpClient: &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	}
@@ -32,7 +32,7 @@ func newClient(baseURL string, config *Config) (*Client, error) {
 
 	return &Client{
 		baseURL:    "https://" + strings.TrimSuffix(baseURL, "/"),
-		apiVersion: config.APIVersion,
+		APIVersion: config.APIVersion,
 		httpClient: &http.Client{
 			Transport: &http.Transport{TLSClientConfig: tlsConfig},
 			Timeout:   30 * time.Second,
@@ -70,12 +70,12 @@ func createTLSConfig(config *Config) (*tls.Config, error) {
 }
 
 func (kc *Client) Get(endpoint string) (*http.Response, error) {
-	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
+	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
 	return kc.httpClient.Get(url) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
 func (kc *Client) doRequestWithBody(method, endpoint string, body any) (*http.Response, error) {
-	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
+	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
 	var buf bytes.Buffer
 	if body != nil {
 		if err := json.NewEncoder(&buf).Encode(body); err != nil {
@@ -99,7 +99,7 @@ func (kc *Client) Put(endpoint string, body any) (*http.Response, error) {
 }
 
 func (kc *Client) Delete(endpoint string) (*http.Response, error) {
-	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.apiVersion, strings.TrimPrefix(endpoint, "/"))
+	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return nil, err

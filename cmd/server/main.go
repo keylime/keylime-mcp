@@ -32,6 +32,9 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_agent_policies", Description: "Retrieves policy configuration (TPM, vTPM, runtime policies) for a specific agent"}, toolHandler.AgentPolicies)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_agent_details", Description: "Retrieves agent details from the registrar (EK certificate, AIK, ip and port)"}, toolHandler.RegistrarGetAgentDetails)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_version", Description: "Retrieves current and supported API keylime versions"}, toolHandler.GetAgentVersion)
+	mcp.AddTool(server, &mcp.Tool{Name: "Registrar_remove_agent", Description: "Removes an agent from the registrar (NOT the verifier)"}, toolHandler.RegistrarRemoveAgent)
+	mcp.AddTool(server, &mcp.Tool{Name: "Enroll_agent_to_verifier", Description: "Enrolls a registered agent into the verifier for active attestation"}, toolHandler.EnrollAgentToVerifier)
+	mcp.AddTool(server, &mcp.Tool{Name: "Unenroll_agent_from_verifier", Description: "Unenrolls an agent from the verifier (NOT the registrar)"}, toolHandler.UnenrollAgentFromVerifier)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
@@ -47,7 +50,7 @@ func loadConfig() keylime.Config {
 		CertDir:       certDir,
 		TLSEnabled:    getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
 		TLSServerName: getEnv("KEYLIME_TLS_SERVER_NAME", "server"),
-		APIVersion:    getEnv("KEYLIME_API_VERSION", "v2.4"),
+		APIVersion:    getEnv("KEYLIME_API_VERSION", "v2.5"),
 		ClientCert:    getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),
 		ClientKey:     getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem"),
 		CAPath:        getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt"),
