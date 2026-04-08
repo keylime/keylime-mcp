@@ -438,3 +438,71 @@ func (h *ToolHandler) GetRuntimePolicy(ctx context.Context, req *mcp.CallToolReq
 
 	return nil, response, nil
 }
+
+func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.ImportRuntimePolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.Name); err != nil {
+		return nil, nil, err
+	}
+
+	data, err := readPolicyFile(input.FilePath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	body := map[string]any{
+		"runtime_policy": base64.StdEncoding.EncodeToString(data),
+	}
+
+	endpoint := fmt.Sprintf("allowlists/%s", input.Name)
+	resp, err := h.service.Verifier.Post(endpoint, body)
+	if err != nil {
+		log.Printf("Error importing runtime policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response struct {
+		Code   int    `json:"code"`
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, nil, err
+	}
+
+	if response.Code < 200 || response.Code >= 300 {
+		return nil, nil, fmt.Errorf("verifier returned %d: %s", response.Code, response.Status)
+	}
+
+	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
+}
+
+func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.DeleteRuntimePolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.PolicyName); err != nil {
+		return nil, nil, err
+	}
+
+	endpoint := fmt.Sprintf("allowlist/%s", input.PolicyName)
+	resp, err := h.service.Verifier.Delete(endpoint)
+	if err != nil {
+		log.Printf("Error deleting runtime policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.DeleteRuntimePolicyOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}

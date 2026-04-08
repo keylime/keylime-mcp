@@ -243,6 +243,16 @@ type ListRuntimePoliciesOutput struct {
 	} `json:"results"`
 }
 
+type ImportRuntimePolicyInput struct {
+	Name     string `json:"name"`
+	FilePath string `json:"file_path"`
+}
+
+type ImportRuntimePolicyOutput struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 type GetRuntimePolicyInput struct {
 	PolicyName string `json:"policy_name"`
 }
@@ -255,4 +265,14 @@ type GetRuntimePolicyOutput struct {
 		TPMPolicy     string `json:"tpm_policy"`
 		RuntimePolicy string `json:"runtime_policy"`
 	} `json:"results"`
+}
+
+type DeleteRuntimePolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type DeleteRuntimePolicyOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
 }

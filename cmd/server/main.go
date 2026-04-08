@@ -37,9 +37,10 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Enroll_agent_to_verifier", Description: "Enrolls a registered agent into the verifier for active attestation. Optional runtime_policy_name and mb_policy_name refer to existing policies on the verifier (use List_runtime_policies to see available names). Leave empty to enroll without policy."}, toolHandler.EnrollAgentToVerifier)
 	mcp.AddTool(server, &mcp.Tool{Name: "Unenroll_agent_from_verifier", Description: "Unenrolls an agent from the verifier (NOT the registrar)"}, toolHandler.UnenrollAgentFromVerifier)
 	mcp.AddTool(server, &mcp.Tool{Name: "Stop_agent", Description: "Stop Verifier pooling on an agent identified by its UUID, but does not remove the agent"}, toolHandler.StopAgent)
-	mcp.AddTool(server, &mcp.Tool{Name: "List_runtime_policies", Description: "Lists all runtime policies stored on the verifier"}, toolHandler.ListRuntimePolicies)
-	mcp.AddTool(server, &mcp.Tool{Name: "Get_runtime_policy", Description: "Gets a specific runtime policy"}, toolHandler.GetRuntimePolicy)
-
+	mcp.AddTool(server, &mcp.Tool{Name: "List_runtime_policies", Description: "Lists names of runtime policies already uploaded to the verifier. These are policies available for assigning to agents during enrollment."}, toolHandler.ListRuntimePolicies)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_runtime_policy", Description: "Gets the content of a specific runtime policy stored on the verifier by name. Returns the policy JSON including digests, excludes, and keyrings. Use List_runtime_policies first to see available names."}, toolHandler.GetRuntimePolicy)
+	mcp.AddTool(server, &mcp.Tool{Name: "Import_runtime_policy", Description: "Uploads a local runtime policy JSON file to the verifier. If the user has no policy file, guide them to generate one offline using 'keylime-policy create runtime' against RPM packages or a clean rootfs (never from a live agent's IMA log)."}, toolHandler.ImportRuntimePolicy)
+	mcp.AddTool(server, &mcp.Tool{Name: "Delete_runtime_policy", Description: "Deletes a runtime policy from the verifier by name. Use List_runtime_policies first to see available names."}, toolHandler.DeleteRuntimePolicy)
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}

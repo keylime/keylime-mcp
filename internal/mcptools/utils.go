@@ -3,7 +3,10 @@ package mcptools
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 )
@@ -54,6 +57,44 @@ func mapAgentToOutput(agentUUID string, agentStatus keylime.AgentStatusResponse)
 		HasMeasuredBoot:             agentStatus.Results.HasMbRefstate != 0,
 		HasRuntimePolicy:            agentStatus.Results.HasRuntimePolicy != 0,
 	}
+}
+
+func validateFilePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("file_path is required")
+	}
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("file_path must be an absolute path")
+	}
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("file_path must not contain path traversal")
+	}
+	return nil
+}
+
+func readPolicyFile(path string) ([]byte, error) {
+	if err := validateFilePath(path); err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("file not found: %s", path)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("file_path is a directory, not a file")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	if !json.Valid(data) {
+		return nil, fmt.Errorf("file is not valid JSON")
+	}
+
+	return data, nil
 }
 
 func parseJSONStr(s string) any {
