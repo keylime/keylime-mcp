@@ -217,6 +217,17 @@ type UnenrollAgentFromVerifierOutput struct {
 	Results struct{} `json:"results"`
 }
 
+type UpdateAgentInput struct {
+	AgentUUID         string `json:"agent_uuid"`
+	RuntimePolicyName string `json:"runtime_policy_name"`
+	MbPolicyName      string `json:"mb_policy_name"`
+}
+
+type UpdateAgentOutput struct {
+	AgentUUID string `json:"agent_uuid"`
+	Status    string `json:"status"`
+}
+
 type StopAgentInput struct {
 	AgentUUID string `json:"agent_uuid"`
 }

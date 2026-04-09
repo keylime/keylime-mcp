@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -237,75 +236,67 @@ func (h *ToolHandler) EnrollAgentToVerifier(ctx context.Context, req *mcp.CallTo
 		}
 	}
 
-	regEndpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
-	regResp, err := h.service.Registrar.Get(regEndpoint)
+	body, err := h.service.PrepareEnrollmentBody(input.AgentUUID, input.RuntimePolicyName, input.MbPolicyName)
 	if err != nil {
-		log.Printf("Error fetching agent details: %v", err)
-		return nil, nil, err
-	}
-	defer regResp.Body.Close()
-
-	var regDetails keylime.RegistrarGetAgentDetailsOutput
-	if err := json.NewDecoder(regResp.Body).Decode(&regDetails); err != nil {
-		log.Printf("Error decoding registrar response: %v", err)
 		return nil, nil, err
 	}
 
-	runtimePolicyB64 := ""
-	if input.RuntimePolicyName != "" {
-		policyEndpoint := fmt.Sprintf("allowlists/%s", input.RuntimePolicyName)
-		policyResp, err := h.service.Verifier.Get(policyEndpoint)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to fetch runtime policy %q: %w", input.RuntimePolicyName, err)
-		}
-		defer policyResp.Body.Close()
-
-		var policyData keylime.GetRuntimePolicyOutput
-		if err := json.NewDecoder(policyResp.Body).Decode(&policyData); err != nil {
-			return nil, nil, fmt.Errorf("failed to decode runtime policy %q: %w", input.RuntimePolicyName, err)
-		}
-		if policyData.Results.RuntimePolicy != "" {
-			runtimePolicyB64 = base64.StdEncoding.EncodeToString([]byte(policyData.Results.RuntimePolicy))
-		}
-	}
-
-	body := map[string]any{
-		"v":                          nil,
-		"cloudagent_ip":              regDetails.Results.IP,
-		"cloudagent_port":            regDetails.Results.Port,
-		"tpm_policy":                 "{}",
-		"runtime_policy":             runtimePolicyB64,
-		"runtime_policy_name":        "",
-		"runtime_policy_key":         "",
-		"mb_policy":                  "",
-		"mb_policy_name":             input.MbPolicyName,
-		"ima_sign_verification_keys": "",
-		"metadata":                   "{}",
-		"revocation_key":             "",
-		"accept_tpm_hash_algs":       []string{"sha256", "sha384", "sha512"},
-		"accept_tpm_encryption_algs": []string{"rsa"},
-		"accept_tpm_signing_algs":    []string{"rsassa"},
-		"ak_tpm":                     regDetails.Results.AikTpm,
-		"mtls_cert":                  regDetails.Results.MtlsCert,
-		"supported_version":          strings.TrimPrefix(h.service.Verifier.APIVersion, "v"),
-	}
-
-	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
-	resp, err := h.service.Verifier.Post(endpoint, body)
+	resp, err := h.service.Verifier.Post(fmt.Sprintf("agents/%s", input.AgentUUID), body)
 	if err != nil {
-		log.Printf("Error enrolling agent to verifier: %v", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("enrollment failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var response keylime.EnrollAgentToVerifierOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, nil, err
 	}
 
 	return nil, response, nil
+}
+
+func (h *ToolHandler) UpdateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.UpdateAgentInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validateAgentUUID(input.AgentUUID); err != nil {
+		return nil, nil, err
+	}
+	if input.RuntimePolicyName != "" {
+		if err := validatePolicyName(input.RuntimePolicyName); err != nil {
+			return nil, nil, fmt.Errorf("runtime_policy_name: %w", err)
+		}
+	}
+	if input.MbPolicyName != "" {
+		if err := validatePolicyName(input.MbPolicyName); err != nil {
+			return nil, nil, fmt.Errorf("mb_policy_name: %w", err)
+		}
+	}
+
+	body, err := h.service.PrepareEnrollmentBody(input.AgentUUID, input.RuntimePolicyName, input.MbPolicyName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	delResp, err := h.service.Verifier.Delete(fmt.Sprintf("agents/%s", input.AgentUUID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to unenroll agent: %w", err)
+	}
+	delResp.Body.Close()
+
+	resp, err := h.service.Verifier.Post(fmt.Sprintf("agents/%s", input.AgentUUID), body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("CRITICAL: agent was unenrolled but re-enrollment failed: %w — manually re-enroll agent %s", err, input.AgentUUID)
+	}
+	defer resp.Body.Close()
+
+	var enrollResp keylime.EnrollAgentToVerifierOutput
+	if err := json.NewDecoder(resp.Body).Decode(&enrollResp); err != nil {
+		return nil, nil, fmt.Errorf("CRITICAL: agent was unenrolled but response decode failed: %w — verify agent %s status", err, input.AgentUUID)
+	}
+
+	return nil, keylime.UpdateAgentOutput{AgentUUID: input.AgentUUID, Status: "updated"}, nil
 }
 
 func (h *ToolHandler) UnenrollAgentFromVerifier(ctx context.Context, req *mcp.CallToolRequest, input keylime.UnenrollAgentFromVerifierInput) (

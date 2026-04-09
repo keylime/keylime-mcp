@@ -35,6 +35,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_version", Description: "Retrieves current and supported API keylime versions"}, toolHandler.GetAgentVersion)
 	mcp.AddTool(server, &mcp.Tool{Name: "Registrar_remove_agent", Description: "Removes an agent from the registrar (NOT the verifier)"}, toolHandler.RegistrarRemoveAgent)
 	mcp.AddTool(server, &mcp.Tool{Name: "Enroll_agent_to_verifier", Description: "Enrolls a registered agent into the verifier for active attestation. Optional runtime_policy_name and mb_policy_name refer to existing policies on the verifier (use List_runtime_policies to see available names). Leave empty to enroll without policy."}, toolHandler.EnrollAgentToVerifier)
+	mcp.AddTool(server, &mcp.Tool{Name: "Update_agent", Description: "Re-enrolls an agent with a new policy. Safely validates everything before unenrolling, then re-enrolls. Use this instead of manually calling Unenroll + Enroll."}, toolHandler.UpdateAgent)
 	mcp.AddTool(server, &mcp.Tool{Name: "Unenroll_agent_from_verifier", Description: "Unenrolls an agent from the verifier (NOT the registrar)"}, toolHandler.UnenrollAgentFromVerifier)
 	mcp.AddTool(server, &mcp.Tool{Name: "Stop_agent", Description: "Stop Verifier pooling on an agent identified by its UUID, but does not remove the agent"}, toolHandler.StopAgent)
 	mcp.AddTool(server, &mcp.Tool{Name: "List_runtime_policies", Description: "Lists names of runtime policies already uploaded to the verifier. These are policies available for assigning to agents during enrollment."}, toolHandler.ListRuntimePolicies)
