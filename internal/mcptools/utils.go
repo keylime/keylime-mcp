@@ -14,6 +14,7 @@ import (
 var (
 	uuidRE     = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	safeNameRE = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+	digestRE   = regexp.MustCompile(`^[0-9a-f]{40,128}$`)
 )
 
 func validateAgentUUID(uuid string) error {
@@ -57,6 +58,14 @@ func mapAgentToOutput(agentUUID string, agentStatus keylime.AgentStatusResponse)
 		HasMeasuredBoot:             agentStatus.Results.HasMbRefstate != 0,
 		HasRuntimePolicy:            agentStatus.Results.HasRuntimePolicy != 0,
 	}
+}
+
+func normalizeDigest(digest, path string) (string, error) {
+	digest = strings.TrimPrefix(digest, "sha256:")
+	if !digestRE.MatchString(digest) {
+		return "", fmt.Errorf("digest for %s must be a hex string (40-128 chars)", path)
+	}
+	return digest, nil
 }
 
 func validateFilePath(path string) error {

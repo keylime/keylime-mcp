@@ -278,6 +278,17 @@ type GetRuntimePolicyOutput struct {
 	} `json:"results"`
 }
 
+type UpdateRuntimePolicyInput struct {
+	PolicyName  string            `json:"policy_name"`
+	AddExcludes []string          `json:"add_excludes"`
+	AddDigests  map[string]string `json:"add_digests"`
+}
+
+type UpdateRuntimePolicyOutput struct {
+	PolicyName string `json:"policy_name"`
+	Status     string `json:"status"`
+}
+
 type DeleteRuntimePolicyInput struct {
 	PolicyName string `json:"policy_name"`
 }

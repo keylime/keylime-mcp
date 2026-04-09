@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -469,6 +471,102 @@ func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}
 
 	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
+}
+
+func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.UpdateRuntimePolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.PolicyName); err != nil {
+		return nil, nil, err
+	}
+	if len(input.AddExcludes) == 0 && len(input.AddDigests) == 0 {
+		return nil, nil, fmt.Errorf("at least one of add_excludes or add_digests is required")
+	}
+
+	// Fetch existing policy
+	getResp, err := h.service.Verifier.Get(fmt.Sprintf("allowlists/%s", input.PolicyName))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch policy %q: %w", input.PolicyName, err)
+	}
+	defer getResp.Body.Close()
+
+	var policyData keylime.GetRuntimePolicyOutput
+	if err := json.NewDecoder(getResp.Body).Decode(&policyData); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode policy %q: %w", input.PolicyName, err)
+	}
+	var policy map[string]any
+	policyStr := policyData.Results.RuntimePolicy
+	if policyStr == "" {
+		policyStr = "{}"
+	}
+	if err := json.Unmarshal([]byte(policyStr), &policy); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse policy JSON: %w", err)
+	}
+
+	// Add excludes
+	for _, new_exclude := range input.AddExcludes {
+		if !strings.HasSuffix(new_exclude, ")?") {
+			new_exclude = new_exclude + "(/.*)?"
+		}
+		excludes, _ := policy["excludes"].([]any)
+		// Check for duplicates
+		var found bool
+		for _, exclude := range excludes {
+			if exclude == new_exclude {
+				found = true
+				break
+			}
+		}
+		if !found {
+			policy["excludes"] = append(excludes, new_exclude)
+		}
+	}
+
+	// Add digests
+	for new_path, new_digest := range input.AddDigests {
+		normalized, err := normalizeDigest(new_digest, new_path)
+		if err != nil {
+			return nil, nil, err
+		}
+		digests, _ := policy["digests"].(map[string]any)
+		if digests == nil {
+			digests = map[string]any{}
+			policy["digests"] = digests
+		}
+		digests[new_path] = []any{normalized}
+	}
+
+	// Update timestamp
+	meta, _ := policy["meta"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+		policy["meta"] = meta
+	}
+	meta["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+
+	// Re-upload
+	policyJSON, err := json.Marshal(policy)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal policy: %w", err)
+	}
+
+	body := map[string]any{
+		"runtime_policy": base64.StdEncoding.EncodeToString(policyJSON),
+	}
+
+	reuploadResp, err := h.service.Verifier.Put(fmt.Sprintf("allowlists/%s", input.PolicyName), body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to update policy: %w", err)
+	}
+	defer reuploadResp.Body.Close()
+
+	if reuploadResp.StatusCode < 200 || reuploadResp.StatusCode >= 300 {
+		return nil, nil, fmt.Errorf("verifier returned %d", reuploadResp.StatusCode)
+	}
+
+	return nil, keylime.UpdateRuntimePolicyOutput{PolicyName: input.PolicyName, Status: "updated"}, nil
 }
 
 func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.DeleteRuntimePolicyInput) (
