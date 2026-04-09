@@ -282,8 +282,41 @@ type DeleteRuntimePolicyInput struct {
 	PolicyName string `json:"policy_name"`
 }
 
-type DeleteRuntimePolicyOutput struct {
-	Code    int      `json:"code"`
-	Status  string   `json:"status"`
-	Results struct{} `json:"results"`
+type DeletePolicyOutput struct {
+	PolicyName string `json:"policy_name"`
+	Status     string `json:"status"`
+}
+
+type ListMBPoliciesInput struct{}
+
+type ListMBPoliciesOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		MBPolicyNames []string `json:"mbpolicy names"`
+	} `json:"results"`
+}
+
+type GetMBPolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type GetMBPolicyOutput struct {
+	Code    int            `json:"code"`
+	Status  string         `json:"status"`
+	Results map[string]any `json:"results"`
+}
+
+type ImportMBPolicyInput struct {
+	Name     string `json:"name"`
+	FilePath string `json:"file_path"`
+}
+
+type ImportMBPolicyOutput struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type DeleteMBPolicyInput struct {
+	PolicyName string `json:"policy_name"`
 }

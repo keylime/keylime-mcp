@@ -480,7 +480,7 @@ func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		return nil, nil, err
 	}
 
-	endpoint := fmt.Sprintf("allowlist/%s", input.PolicyName)
+	endpoint := fmt.Sprintf("allowlists/%s", input.PolicyName)
 	resp, err := h.service.Verifier.Delete(endpoint)
 	if err != nil {
 		log.Printf("Error deleting runtime policy: %v", err)
@@ -488,7 +488,27 @@ func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}
 	defer resp.Body.Close()
 
-	var response keylime.DeleteRuntimePolicyOutput
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, fmt.Errorf("verifier returned %d", resp.StatusCode)
+	}
+
+	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
+}
+
+func (h *ToolHandler) ListMBPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.ListMBPoliciesInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	endpoint := "mbpolicies/"
+	resp, err := h.service.Verifier.Get(endpoint)
+	if err != nil {
+		log.Printf("Error listing measured boot policies: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.ListMBPoliciesOutput
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		log.Printf("Error decoding response: %v", err)
@@ -496,4 +516,96 @@ func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}
 
 	return nil, response, nil
+}
+
+func (h *ToolHandler) GetMBPolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetMBPolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.PolicyName); err != nil {
+		return nil, nil, err
+	}
+
+	endpoint := fmt.Sprintf("mbpolicies/%s", input.PolicyName)
+	resp, err := h.service.Verifier.Get(endpoint)
+	if err != nil {
+		log.Printf("Error getting measured boot policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response keylime.GetMBPolicyOutput
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		log.Printf("Error decoding response: %v", err)
+		return nil, nil, err
+	}
+
+	return nil, response, nil
+}
+
+func (h *ToolHandler) ImportMBPolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.ImportMBPolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.Name); err != nil {
+		return nil, nil, err
+	}
+
+	data, err := readPolicyFile(input.FilePath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	body := map[string]any{
+		"mb_policy": string(data),
+	}
+
+	endpoint := fmt.Sprintf("mbpolicies/%s", input.Name)
+	resp, err := h.service.Verifier.Post(endpoint, body)
+	if err != nil {
+		log.Printf("Error importing measured boot policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var response struct {
+		Code   int    `json:"code"`
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, nil, err
+	}
+
+	if response.Code < 200 || response.Code >= 300 {
+		return nil, nil, fmt.Errorf("verifier returned %d: %s", response.Code, response.Status)
+	}
+
+	return nil, keylime.ImportMBPolicyOutput{Name: input.Name, Status: "imported"}, nil
+}
+
+func (h *ToolHandler) DeleteMBPolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.DeleteMBPolicyInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	if err := validatePolicyName(input.PolicyName); err != nil {
+		return nil, nil, err
+	}
+
+	endpoint := fmt.Sprintf("mbpolicies/%s", input.PolicyName)
+	resp, err := h.service.Verifier.Delete(endpoint)
+	if err != nil {
+		log.Printf("Error deleting measured boot policy: %v", err)
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, fmt.Errorf("verifier returned %d", resp.StatusCode)
+	}
+
+	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
 }
