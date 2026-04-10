@@ -150,8 +150,11 @@ func readPolicyFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
+	if len(data) == 0 {
+		return nil, fmt.Errorf("file is empty: %s", path)
+	}
 	if !json.Valid(data) {
-		return nil, fmt.Errorf("file is not valid JSON")
+		return nil, fmt.Errorf("file is not valid JSON: %s", path)
 	}
 
 	return data, nil
@@ -161,11 +164,11 @@ func parseJSONStr(s string) any {
 	if s == "" {
 		return map[string]any{}
 	}
-	var v any
-	if err := json.Unmarshal([]byte(s), &v); err != nil {
-		return map[string]any{}
+	var parsed any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return s
 	}
-	return v
+	return parsed
 }
 
 func nonNilSlice(s []string) []string {
