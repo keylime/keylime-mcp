@@ -149,24 +149,13 @@ func (h *ToolHandler) RegistrarGetAgentDetails(ctx context.Context, req *mcp.Cal
 	if err := validateAgentUUID(input.AgentUUID); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
-	resp, err := h.service.Registrar.Get(endpoint)
+	result, err := fetchAndDecode[keylime.RegistrarGetAgentDetailsOutput](
+		h.service.Registrar.Get(fmt.Sprintf("agents/%s", input.AgentUUID)),
+	)
 	if err != nil {
-		log.Printf("Error getting agent details: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.RegistrarGetAgentDetailsOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
-
+	return nil, result, nil
 }
 
 func (h *ToolHandler) GetAgentVersion(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentVersionInput) (
@@ -174,22 +163,11 @@ func (h *ToolHandler) GetAgentVersion(ctx context.Context, req *mcp.CallToolRequ
 	any,
 	error,
 ) {
-	endpoint := "version"
-	resp, err := h.service.Registrar.GetRaw(endpoint)
+	result, err := fetchAndDecode[keylime.GetAgentVersionOutput](h.service.Registrar.GetRaw("version"))
 	if err != nil {
-		log.Printf("Error getting agent version: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.GetAgentVersionOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) RegistrarRemoveAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.RegistrarRemoveAgentInput) (
@@ -200,23 +178,13 @@ func (h *ToolHandler) RegistrarRemoveAgent(ctx context.Context, req *mcp.CallToo
 	if err := validateAgentUUID(input.AgentUUID); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
-	resp, err := h.service.Registrar.Delete(endpoint)
+	result, err := fetchAndDecode[keylime.RegistrarRemoveAgentOutput](
+		h.service.Registrar.Delete(fmt.Sprintf("agents/%s", input.AgentUUID)),
+	)
 	if err != nil {
-		log.Printf("Error removing agent from registrar: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.RegistrarRemoveAgentOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) EnrollAgentToVerifier(ctx context.Context, req *mcp.CallToolRequest, input keylime.EnrollAgentToVerifierInput) (
@@ -243,18 +211,13 @@ func (h *ToolHandler) EnrollAgentToVerifier(ctx context.Context, req *mcp.CallTo
 		return nil, nil, err
 	}
 
-	resp, err := h.service.Verifier.Post(fmt.Sprintf("agents/%s", input.AgentUUID), body)
+	result, err := fetchAndDecode[keylime.EnrollAgentToVerifierOutput](
+		h.service.Verifier.Post(fmt.Sprintf("agents/%s", input.AgentUUID), body),
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("enrollment failed: %w", err)
 	}
-	defer resp.Body.Close()
-
-	var response keylime.EnrollAgentToVerifierOutput
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) UpdateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.UpdateAgentInput) (
@@ -281,11 +244,9 @@ func (h *ToolHandler) UpdateAgent(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, nil, err
 	}
 
-	delResp, err := h.service.Verifier.Delete(fmt.Sprintf("agents/%s", input.AgentUUID))
-	if err != nil {
+	if err := deleteAndCheck(h.service.Verifier.Delete(fmt.Sprintf("agents/%s", input.AgentUUID))); err != nil {
 		return nil, nil, fmt.Errorf("failed to unenroll agent: %w", err)
 	}
-	delResp.Body.Close()
 
 	resp, err := h.service.Verifier.Post(fmt.Sprintf("agents/%s", input.AgentUUID), body)
 	if err != nil {
@@ -309,23 +270,13 @@ func (h *ToolHandler) UnenrollAgentFromVerifier(ctx context.Context, req *mcp.Ca
 	if err := validateAgentUUID(input.AgentUUID); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("agents/%s", input.AgentUUID)
-	resp, err := h.service.Verifier.Delete(endpoint)
+	result, err := fetchAndDecode[keylime.UnenrollAgentFromVerifierOutput](
+		h.service.Verifier.Delete(fmt.Sprintf("agents/%s", input.AgentUUID)),
+	)
 	if err != nil {
-		log.Printf("Error removing agent from verifier: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.UnenrollAgentFromVerifierOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.ReactivateAgentInput) (
@@ -336,23 +287,13 @@ func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequ
 	if err := validateAgentUUID(input.AgentUUID); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("agents/%s/reactivate", input.AgentUUID)
-	resp, err := h.service.Verifier.Put(endpoint, nil)
+	result, err := fetchAndDecode[keylime.ReactivateAgentOutput](
+		h.service.Verifier.Put(fmt.Sprintf("agents/%s/reactivate", input.AgentUUID), nil),
+	)
 	if err != nil {
-		log.Printf("Error reactivating agent: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.ReactivateAgentOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) StopAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.StopAgentInput) (
@@ -363,23 +304,13 @@ func (h *ToolHandler) StopAgent(ctx context.Context, req *mcp.CallToolRequest, i
 	if err := validateAgentUUID(input.AgentUUID); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("agents/%s/stop", input.AgentUUID)
-	resp, err := h.service.Verifier.Put(endpoint, nil)
+	result, err := fetchAndDecode[keylime.StopAgentOutput](
+		h.service.Verifier.Put(fmt.Sprintf("agents/%s/stop", input.AgentUUID), nil),
+	)
 	if err != nil {
-		log.Printf("Error stopping agent: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.StopAgentOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) ListRuntimePolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.ListRuntimePoliciesInput) (
@@ -387,22 +318,11 @@ func (h *ToolHandler) ListRuntimePolicies(ctx context.Context, req *mcp.CallTool
 	any,
 	error,
 ) {
-	endpoint := "allowlists/"
-	resp, err := h.service.Verifier.Get(endpoint)
+	result, err := fetchAndDecode[keylime.ListRuntimePoliciesOutput](h.service.Verifier.Get("allowlists/"))
 	if err != nil {
-		log.Printf("Error listing runtime policies: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.ListRuntimePoliciesOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) GetRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetRuntimePolicyInput) (
@@ -413,23 +333,13 @@ func (h *ToolHandler) GetRuntimePolicy(ctx context.Context, req *mcp.CallToolReq
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("allowlists/%s", input.PolicyName)
-	resp, err := h.service.Verifier.Get(endpoint)
+	result, err := fetchAndDecode[keylime.GetRuntimePolicyOutput](
+		h.service.Verifier.Get(fmt.Sprintf("allowlists/%s", input.PolicyName)),
+	)
 	if err != nil {
-		log.Printf("Error getting runtime policy: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.GetRuntimePolicyOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.ImportRuntimePolicyInput) (
@@ -473,6 +383,7 @@ func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
 }
 
+//nolint:gocognit,gocyclo // sequential steps of a single read-modify-write operation
 func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.UpdateRuntimePolicyInput) (
 	*mcp.CallToolResult,
 	any,
@@ -506,27 +417,26 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}
 
 	// Add excludes
-	for _, new_exclude := range input.AddExcludes {
-		if !strings.HasSuffix(new_exclude, ")?") {
-			new_exclude = new_exclude + "(/.*)?"
+	for _, newExclude := range input.AddExcludes {
+		if !strings.HasSuffix(newExclude, ")?") {
+			newExclude += "(/.*)?"
 		}
 		excludes, _ := policy["excludes"].([]any)
-		// Check for duplicates
 		var found bool
 		for _, exclude := range excludes {
-			if exclude == new_exclude {
+			if exclude == newExclude {
 				found = true
 				break
 			}
 		}
 		if !found {
-			policy["excludes"] = append(excludes, new_exclude)
+			policy["excludes"] = append(excludes, newExclude)
 		}
 	}
 
 	// Add digests
-	for new_path, new_digest := range input.AddDigests {
-		normalized, err := normalizeDigest(new_digest, new_path)
+	for newPath, newDigest := range input.AddDigests {
+		normalized, err := normalizeDigest(newDigest, newPath)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -535,7 +445,7 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 			digests = map[string]any{}
 			policy["digests"] = digests
 		}
-		digests[new_path] = []any{normalized}
+		digests[newPath] = []any{normalized}
 	}
 
 	// Update timestamp
@@ -577,19 +487,9 @@ func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("allowlists/%s", input.PolicyName)
-	resp, err := h.service.Verifier.Delete(endpoint)
-	if err != nil {
-		log.Printf("Error deleting runtime policy: %v", err)
+	if err := deleteAndCheck(h.service.Verifier.Delete(fmt.Sprintf("allowlists/%s", input.PolicyName))); err != nil {
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("verifier returned %d", resp.StatusCode)
-	}
-
 	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
 }
 
@@ -598,22 +498,11 @@ func (h *ToolHandler) ListMBPolicies(ctx context.Context, req *mcp.CallToolReque
 	any,
 	error,
 ) {
-	endpoint := "mbpolicies/"
-	resp, err := h.service.Verifier.Get(endpoint)
+	result, err := fetchAndDecode[keylime.ListMBPoliciesOutput](h.service.Verifier.Get("mbpolicies/"))
 	if err != nil {
-		log.Printf("Error listing measured boot policies: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.ListMBPoliciesOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) GetMBPolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetMBPolicyInput) (
@@ -624,23 +513,13 @@ func (h *ToolHandler) GetMBPolicy(ctx context.Context, req *mcp.CallToolRequest,
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("mbpolicies/%s", input.PolicyName)
-	resp, err := h.service.Verifier.Get(endpoint)
+	result, err := fetchAndDecode[keylime.GetMBPolicyOutput](
+		h.service.Verifier.Get(fmt.Sprintf("mbpolicies/%s", input.PolicyName)),
+	)
 	if err != nil {
-		log.Printf("Error getting measured boot policy: %v", err)
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	var response keylime.GetMBPolicyOutput
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		log.Printf("Error decoding response: %v", err)
-		return nil, nil, err
-	}
-
-	return nil, response, nil
+	return nil, result, nil
 }
 
 func (h *ToolHandler) ImportMBPolicy(ctx context.Context, req *mcp.CallToolRequest, input keylime.ImportMBPolicyInput) (
@@ -692,18 +571,8 @@ func (h *ToolHandler) DeleteMBPolicy(ctx context.Context, req *mcp.CallToolReque
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-
-	endpoint := fmt.Sprintf("mbpolicies/%s", input.PolicyName)
-	resp, err := h.service.Verifier.Delete(endpoint)
-	if err != nil {
-		log.Printf("Error deleting measured boot policy: %v", err)
+	if err := deleteAndCheck(h.service.Verifier.Delete(fmt.Sprintf("mbpolicies/%s", input.PolicyName))); err != nil {
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("verifier returned %d", resp.StatusCode)
-	}
-
 	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
 }

@@ -3,6 +3,7 @@ package mcptools
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +11,32 @@ import (
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 )
+
+// fetchAndDecode reads an HTTP response body and decodes it into a typed struct.
+func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
+	var zero T
+	if err != nil {
+		return zero, err
+	}
+	defer resp.Body.Close()
+	var result T
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return zero, err
+	}
+	return result, nil
+}
+
+// deleteAndCheck verifies a DELETE request returned 204 with an empty body.
+func deleteAndCheck(resp *http.Response, err error) error {
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("verifier returned %d", resp.StatusCode)
+	}
+	return nil
+}
 
 var (
 	uuidRE     = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -94,7 +121,7 @@ func readPolicyFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("file_path is a directory, not a file")
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is validated by validateFilePath above
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
