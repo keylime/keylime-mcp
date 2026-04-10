@@ -3,6 +3,7 @@ package mcptools
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,18 @@ import (
 	"github.com/keylime/keylime-mcp/internal/keylime"
 )
 
+// extractAPIError reads the response body and returns a descriptive error.
+func extractAPIError(resp *http.Response) error {
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	var apiErr struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(bodyBytes, &apiErr); err == nil && apiErr.Status != "" {
+		return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, apiErr.Status)
+	}
+	return fmt.Errorf("API request failed with HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+}
+
 // fetchAndDecode reads an HTTP response body and decodes it into a typed struct.
 func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
 	var zero T
@@ -19,21 +32,24 @@ func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
 		return zero, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return zero, extractAPIError(resp)
+	}
 	var result T
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return zero, err
+		return zero, fmt.Errorf("failed to decode response: %w", err)
 	}
 	return result, nil
 }
 
-// deleteAndCheck verifies a DELETE request returned 204 with an empty body.
+// deleteAndCheck verifies a DELETE request returned a success code.
 func deleteAndCheck(resp *http.Response, err error) error {
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("verifier returned %d", resp.StatusCode)
+		return extractAPIError(resp)
 	}
 	return nil
 }
@@ -95,6 +111,8 @@ func normalizeDigest(digest, path string) (string, error) {
 	return digest, nil
 }
 
+const maxPolicyFileSize = 50 * 1024 * 1024 // 50 MB
+
 func validateFilePath(path string) error {
 	if path == "" {
 		return fmt.Errorf("file_path is required")
@@ -104,6 +122,9 @@ func validateFilePath(path string) error {
 	}
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("file_path must not contain path traversal")
+	}
+	if filepath.Ext(path) != ".json" {
+		return fmt.Errorf("file_path must have .json extension")
 	}
 	return nil
 }
@@ -119,6 +140,9 @@ func readPolicyFile(path string) ([]byte, error) {
 	}
 	if info.IsDir() {
 		return nil, fmt.Errorf("file_path is a directory, not a file")
+	}
+	if info.Size() > maxPolicyFileSize {
+		return nil, fmt.Errorf("file too large (%d bytes, max %d)", info.Size(), maxPolicyFileSize)
 	}
 
 	data, err := os.ReadFile(path) // #nosec G304 -- path is validated by validateFilePath above

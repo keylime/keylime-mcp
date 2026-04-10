@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/keylime/keylime-mcp/internal/keylime"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/errgroup"
 )
 
 type ToolHandler struct {
@@ -93,24 +95,32 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 		return nil, nil, err
 	}
 
-	failedAgents := keylime.GetFailedAgentsOutput{
-		FailedAgents: []keylime.GetAgentStatusOutput{},
-	}
+	var mu sync.Mutex
+	var failed []keylime.GetAgentStatusOutput
+	workers, _ := errgroup.WithContext(ctx)
+	workers.SetLimit(10) // 10 was choosed as compromise between performance and resource usage
+
 	for _, agentUUID := range uuids {
-		agentStatus, err := h.service.FetchAgentDetails(agentUUID)
-		if err != nil {
-			continue // skip agents not enrolled in verifier
-		}
-		if agentStatus.Code < 200 || agentStatus.Code >= 300 {
-			continue
-		}
-
-		if keylime.IsFailedState(agentStatus.Results.OperationalState) {
-			failedAgents.FailedAgents = append(failedAgents.FailedAgents, mapAgentToOutput(agentUUID, agentStatus))
-		}
+		workers.Go(func() error {
+			agentStatus, err := h.service.FetchAgentDetails(agentUUID)
+			if err != nil || agentStatus.Code < 200 || agentStatus.Code >= 300 {
+				return nil // skip agents not enrolled in verifier
+			}
+			if keylime.IsFailedState(agentStatus.Results.OperationalState) {
+				output := mapAgentToOutput(agentUUID, agentStatus)
+				mu.Lock()
+				failed = append(failed, output)
+				mu.Unlock()
+			}
+			return nil
+		})
 	}
 
-	return nil, failedAgents, nil
+	if err := workers.Wait(); err != nil {
+		return nil, nil, err
+	}
+
+	return nil, keylime.GetFailedAgentsOutput{FailedAgents: failed}, nil
 }
 
 func (h *ToolHandler) AgentPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentPoliciesInput) (
@@ -473,7 +483,7 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	defer reuploadResp.Body.Close()
 
 	if reuploadResp.StatusCode < 200 || reuploadResp.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("verifier returned %d", reuploadResp.StatusCode)
+		return nil, nil, extractAPIError(reuploadResp)
 	}
 
 	return nil, keylime.UpdateRuntimePolicyOutput{PolicyName: input.PolicyName, Status: "updated"}, nil
