@@ -402,8 +402,8 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-	if len(input.AddExcludes) == 0 && len(input.AddDigests) == 0 {
-		return nil, nil, fmt.Errorf("at least one of add_excludes or add_digests is required")
+	if len(input.AddExcludes) == 0 && len(input.AddDigests) == 0 && len(input.RemoveExcludes) == 0 && len(input.RemoveDigests) == 0 {
+		return nil, nil, fmt.Errorf("at least one of add_excludes, add_digests, remove_excludes or remove_digests is required")
 	}
 
 	// Fetch existing policy
@@ -425,6 +425,24 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	if err := json.Unmarshal([]byte(policyStr), &policy); err != nil {
 		return nil, nil, fmt.Errorf("failed to parse policy JSON: %w", err)
 	}
+	// Remove excludes
+	if len(input.RemoveExcludes) > 0 {
+		oldExcludes, _ := policy["excludes"].([]any)
+		var filtered []any
+		for _, e := range oldExcludes {
+			keep := true
+			for _, r := range input.RemoveExcludes {
+				if e == r {
+					keep = false
+					break
+				}
+			}
+			if keep {
+				filtered = append(filtered, e)
+			}
+		}
+		policy["excludes"] = filtered
+	}
 
 	// Add excludes
 	for _, newExclude := range input.AddExcludes {
@@ -433,14 +451,22 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		}
 		excludes, _ := policy["excludes"].([]any)
 		var found bool
-		for _, exclude := range excludes {
-			if exclude == newExclude {
+		for _, e := range excludes {
+			if e == newExclude {
 				found = true
 				break
 			}
 		}
 		if !found {
 			policy["excludes"] = append(excludes, newExclude)
+		}
+	}
+
+	// Remove digests
+	if len(input.RemoveDigests) > 0 {
+		digests, _ := policy["digests"].(map[string]any)
+		for _, path := range input.RemoveDigests {
+			delete(digests, path)
 		}
 	}
 
