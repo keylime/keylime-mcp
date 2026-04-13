@@ -48,6 +48,10 @@ func (h *ToolHandler) GetVerifierEnrolledAgents(ctx context.Context, req *mcp.Ca
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, extractAPIError(resp)
+	}
+
 	var parsed struct {
 		Results struct {
 			UUIDs [][]string `json:"uuids"`
@@ -378,16 +382,8 @@ func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}
 	defer resp.Body.Close()
 
-	var response struct {
-		Code   int    `json:"code"`
-		Status string `json:"status"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, nil, err
-	}
-
-	if response.Code < 200 || response.Code >= 300 {
-		return nil, nil, fmt.Errorf("verifier returned %d: %s", response.Code, response.Status)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, extractAPIError(resp)
 	}
 
 	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
@@ -412,6 +408,10 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		return nil, nil, fmt.Errorf("failed to fetch policy %q: %w", input.PolicyName, err)
 	}
 	defer getResp.Body.Close()
+
+	if getResp.StatusCode < 200 || getResp.StatusCode >= 300 {
+		return nil, nil, extractAPIError(getResp)
+	}
 
 	var policyData keylime.GetRuntimePolicyOutput
 	if err := json.NewDecoder(getResp.Body).Decode(&policyData); err != nil {
@@ -584,16 +584,8 @@ func (h *ToolHandler) ImportMBPolicy(ctx context.Context, req *mcp.CallToolReque
 	}
 	defer resp.Body.Close()
 
-	var response struct {
-		Code   int    `json:"code"`
-		Status string `json:"status"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, nil, err
-	}
-
-	if response.Code < 200 || response.Code >= 300 {
-		return nil, nil, fmt.Errorf("verifier returned %d: %s", response.Code, response.Status)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, extractAPIError(resp)
 	}
 
 	return nil, keylime.ImportMBPolicyOutput{Name: input.Name, Status: "imported"}, nil
