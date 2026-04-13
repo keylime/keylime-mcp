@@ -174,15 +174,27 @@ type RegistrarGetAgentDetailsOutput struct {
 	} `json:"results"`
 }
 
-type GetAgentVersionInput struct{}
+type GetVersionAndHealthInput struct{}
 
-type GetAgentVersionOutput struct {
+type GetVersionOutput struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Results struct {
 		CurrentVersion    string   `json:"current_version"`
 		SupportedVersions []string `json:"supported_versions"`
 	} `json:"results"`
+}
+
+type ServiceStatus struct {
+	Service           string   `json:"service"`
+	Reachable         bool     `json:"reachable"`
+	CurrentVersion    string   `json:"current_version"`
+	SupportedVersions []string `json:"supported_versions"`
+	Error             string   `json:"error,omitempty"`
+}
+
+type GetVersionAndHealthOutput struct {
+	Services []ServiceStatus `json:"services"`
 }
 
 type RegistrarRemoveAgentInput struct {
@@ -332,4 +344,15 @@ type ImportMBPolicyOutput struct {
 
 type DeleteMBPolicyInput struct {
 	PolicyName string `json:"policy_name"`
+}
+
+type InvestigateVerifierLogsInput struct {
+	Lines     int    `json:"lines"`
+	AgentUUID string `json:"agent_uuid"`
+	Filter    string `json:"filter"`
+}
+
+type InvestigateVerifierLogsOutput struct {
+	Logs          string `json:"logs"`
+	FilterApplied string `json:"filter_applied"`
 }

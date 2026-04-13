@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -172,16 +174,28 @@ func (h *ToolHandler) RegistrarGetAgentDetails(ctx context.Context, req *mcp.Cal
 	return nil, result, nil
 }
 
-func (h *ToolHandler) GetAgentVersion(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentVersionInput) (
+func (h *ToolHandler) GetVersionAndHealth(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetVersionAndHealthInput) (
 	*mcp.CallToolResult,
 	any,
 	error,
 ) {
-	result, err := fetchAndDecode[keylime.GetAgentVersionOutput](h.service.Registrar.GetRaw("version"))
+	var services []keylime.ServiceStatus
+
+	verifierResp, err := fetchAndDecode[keylime.GetVersionOutput](h.service.Verifier.GetRaw("version"))
 	if err != nil {
-		return nil, nil, err
+		services = append(services, keylime.ServiceStatus{Service: "verifier", Reachable: false, Error: err.Error()})
+	} else {
+		services = append(services, keylime.ServiceStatus{Service: "verifier", CurrentVersion: verifierResp.Results.CurrentVersion, SupportedVersions: verifierResp.Results.SupportedVersions, Reachable: true})
 	}
-	return nil, result, nil
+
+	registrarResp, err := fetchAndDecode[keylime.GetVersionOutput](h.service.Registrar.GetRaw("version"))
+	if err != nil {
+		services = append(services, keylime.ServiceStatus{Service: "registrar", Reachable: false, Error: err.Error()})
+	} else {
+		services = append(services, keylime.ServiceStatus{Service: "registrar", CurrentVersion: registrarResp.Results.CurrentVersion, SupportedVersions: registrarResp.Results.SupportedVersions, Reachable: true})
+	}
+
+	return nil, keylime.GetVersionAndHealthOutput{Services: services}, nil
 }
 
 func (h *ToolHandler) RegistrarRemoveAgent(ctx context.Context, req *mcp.CallToolRequest, input keylime.RegistrarRemoveAgentInput) (
@@ -603,4 +617,59 @@ func (h *ToolHandler) DeleteMBPolicy(ctx context.Context, req *mcp.CallToolReque
 		return nil, nil, err
 	}
 	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
+}
+
+func (h *ToolHandler) InvestigateVerifierLogs(ctx context.Context, req *mcp.CallToolRequest, input keylime.InvestigateVerifierLogsInput) (
+	*mcp.CallToolResult,
+	any,
+	error,
+) {
+	var logFilters = map[string][]string{
+		"attestation_failures": {"FAIL", "fail", "not_in_allowlist", "invalid", "mismatch", "pcr", "quote", "policy", "not reachable", "terminated", "Revocation"},
+		"errors":               {"ERROR", "Traceback", "Exception", "CRITICAL", "Unable"},
+	}
+	filter := input.Filter
+	if filter == "" {
+		filter = "all"
+	}
+	if filter != "all" {
+		if _, ok := logFilters[filter]; !ok {
+			return nil, nil, fmt.Errorf("invalid filter %q: must be 'all', 'attestation_failures', or 'errors'", filter)
+		}
+	}
+
+	lines := input.Lines
+	if lines <= 0 {
+		lines = 50
+	}
+	if lines > 200 {
+		lines = 200
+	}
+
+	if input.AgentUUID != "" {
+		if err := validateAgentUUID(input.AgentUUID); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	args := []string{"-u", "keylime_verifier", "--no-pager", "-n", fmt.Sprintf("%d", lines)}
+	if input.AgentUUID != "" {
+		args = append(args, "--grep", input.AgentUUID)
+	}
+
+	out, err := exec.CommandContext(ctx, "journalctl", args...).Output() //nolint:gosec // args are validated
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return nil, keylime.InvestigateVerifierLogsOutput{Logs: "", FilterApplied: filter}, nil
+		}
+		return nil, nil, fmt.Errorf("failed to read verifier logs: %w", err)
+	}
+
+	logs := string(out)
+	if keywords, ok := logFilters[filter]; ok {
+		logs = filterLogLines(logs, keywords)
+	}
+
+	return nil, keylime.InvestigateVerifierLogsOutput{Logs: logs, FilterApplied: filter}, nil
 }

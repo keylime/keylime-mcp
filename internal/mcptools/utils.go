@@ -1,6 +1,7 @@
 package mcptools
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -176,4 +177,19 @@ func nonNilSlice(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+func filterLogLines(logs string, keywords []string) string {
+	var filtered []string
+	scanner := bufio.NewScanner(strings.NewReader(logs))
+	for scanner.Scan() {
+		line := scanner.Text()
+		for _, kw := range keywords {
+			if strings.Contains(line, kw) {
+				filtered = append(filtered, line)
+				break
+			}
+		}
+	}
+	return strings.Join(filtered, "\n")
 }

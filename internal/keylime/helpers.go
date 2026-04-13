@@ -91,7 +91,7 @@ func (s *Service) PrepareEnrollmentBody(agentUUID, runtimePolicyName, mbPolicyNa
 		"v":                          nil,
 		"cloudagent_ip":              regDetails.Results.IP,
 		"cloudagent_port":            regDetails.Results.Port,
-		"tpm_policy":                 "{}",
+		"tpm_policy":                 `{"mask":"0x0"}`,
 		"runtime_policy":             runtimePolicyB64,
 		"runtime_policy_name":        "",
 		"runtime_policy_key":         "",

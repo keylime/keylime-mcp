@@ -25,7 +25,7 @@ func main() {
 	toolHandler := mcptools.NewToolHandler(keylimeService)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "Keylime", Version: "v1.0.0"}, nil)
-	mcp.AddTool(server, &mcp.Tool{Name: "Get_version", Description: "Retrieves current and supported API keylime versions"}, toolHandler.GetAgentVersion)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_version_and_health", Description: "Retrieves current and supported API Keylime Verifier and Registrar versions and checks if the services are reachable"}, toolHandler.GetVersionAndHealth)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_all_agents", Description: "Retrieves a list of all registered agent UUIDs from the registrar"}, toolHandler.GetAllAgents)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_verifier_enrolled_agents", Description: "Retrieves a list of agent UUIDs enrolled in the verifier for active attestation"}, toolHandler.GetVerifierEnrolledAgents)
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_agent_status", Description: "Retrieves attestation status from the verifier: operational state, attestation count, severity, last quote timestamps, and algorithms."}, toolHandler.GetAgentStatus)
@@ -47,6 +47,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "Get_mb_policy", Description: "Gets the content of a specific measured boot policy stored on the verifier by name. Returns the policy JSON including boot event logs and expected PCR values. Use List_mb_policies first to see available names."}, toolHandler.GetMBPolicy)
 	mcp.AddTool(server, &mcp.Tool{Name: "Import_mb_policy", Description: "Uploads a local measured boot policy JSON file to the verifier. If the user has no policy file, tell them to generate one with: 'sudo keylime-policy create measured-boot -e /sys/kernel/security/tpm0/binary_bios_measurements -o /tmp/mb_policy.json'. If it fails with a SecureBoot error, add the -i flag to generate without SecureBoot validation. Then provide the output path to this tool."}, toolHandler.ImportMBPolicy)
 	mcp.AddTool(server, &mcp.Tool{Name: "Delete_mb_policy", Description: "Deletes a measured boot policy from the verifier by name. Use List_mb_policies first to see available names."}, toolHandler.DeleteMBPolicy)
+	mcp.AddTool(server, &mcp.Tool{Name: "Get_verifier_logs", Description: "Investigates attestation failures and retrieves Keylime Verifier logs from journalctl. Requires co-located verifier. Filter by agent_uuid and use filter parameter: 'attestation_failures' for file mismatches, invalid quotes and policy violations, 'errors' for error-level messages, 'all' for unfiltered output (default). Lines parameter controls log window (default 50, max 200)."}, toolHandler.InvestigateVerifierLogs)
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}
