@@ -657,7 +657,7 @@ func (h *ToolHandler) InvestigateVerifierLogs(ctx context.Context, req *mcp.Call
 		args = append(args, "--grep", input.AgentUUID)
 	}
 
-	out, err := exec.CommandContext(ctx, "journalctl", args...).Output() //nolint:gosec // args are validated
+	out, err := exec.CommandContext(ctx, "journalctl", args...).Output() // #nosec G204 -- args are validated (UUID regex, integer lines)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
