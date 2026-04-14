@@ -87,11 +87,22 @@ func (s *Service) PrepareEnrollmentBody(agentUUID, runtimePolicyName, mbPolicyNa
 		}
 	}
 
+	tpmMask := 0
+	if runtimePolicyName != "" {
+		tpmMask |= 1 << 10 // IMA_PCR: runtime policy requires PCR 10 monitoring
+	}
+	if mbPolicyName != "" {
+		for _, pcr := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15} {
+			tpmMask |= 1 << pcr // MEASUREDBOOT_PCRS
+		}
+	}
+	tpmPolicy := fmt.Sprintf(`{"mask":"%#x"}`, tpmMask)
+
 	return map[string]any{
 		"v":                          nil,
 		"cloudagent_ip":              regDetails.Results.IP,
 		"cloudagent_port":            regDetails.Results.Port,
-		"tpm_policy":                 `{"mask":"0x0"}`,
+		"tpm_policy":                 tpmPolicy,
 		"runtime_policy":             runtimePolicyB64,
 		"runtime_policy_name":        "",
 		"runtime_policy_key":         "",
