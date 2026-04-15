@@ -2,6 +2,7 @@ package keylime
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -69,12 +70,16 @@ func createTLSConfig(config *Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func (kc *Client) Get(endpoint string) (*http.Response, error) {
+func (kc *Client) Get(ctx context.Context, endpoint string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
-	return kc.httpClient.Get(url) // #nosec G704 -- URL is built from trusted config, not user input
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *Client) doRequestWithBody(method, endpoint string, body any) (*http.Response, error) {
+func (kc *Client) doRequestWithBody(ctx context.Context, method, endpoint string, body any) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
 	var buf bytes.Buffer
 	if body != nil {
@@ -82,7 +87,7 @@ func (kc *Client) doRequestWithBody(method, endpoint string, body any) (*http.Re
 			return nil, fmt.Errorf("failed to marshal body: %w", err)
 		}
 	}
-	req, err := http.NewRequest(method, url, &buf)
+	req, err := http.NewRequestWithContext(ctx, method, url, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -90,17 +95,17 @@ func (kc *Client) doRequestWithBody(method, endpoint string, body any) (*http.Re
 	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
-func (kc *Client) Post(endpoint string, body any) (*http.Response, error) {
-	return kc.doRequestWithBody("POST", endpoint, body)
+func (kc *Client) Post(ctx context.Context, endpoint string, body any) (*http.Response, error) {
+	return kc.doRequestWithBody(ctx, "POST", endpoint, body)
 }
 
-func (kc *Client) Put(endpoint string, body any) (*http.Response, error) {
-	return kc.doRequestWithBody("PUT", endpoint, body)
+func (kc *Client) Put(ctx context.Context, endpoint string, body any) (*http.Response, error) {
+	return kc.doRequestWithBody(ctx, "PUT", endpoint, body)
 }
 
-func (kc *Client) Delete(endpoint string) (*http.Response, error) {
+func (kc *Client) Delete(ctx context.Context, endpoint string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +113,11 @@ func (kc *Client) Delete(endpoint string) (*http.Response, error) {
 }
 
 // GetRaw sends a GET without the API version prefix. Used for /version endpoint.
-func (kc *Client) GetRaw(path string) (*http.Response, error) {
+func (kc *Client) GetRaw(ctx context.Context, path string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", kc.baseURL, strings.TrimPrefix(path, "/"))
-	return kc.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return kc.httpClient.Do(req)
 }

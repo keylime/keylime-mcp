@@ -1,9 +1,11 @@
 package keylime
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"strings"
 )
@@ -35,13 +37,16 @@ func IsFailedState(state int) bool {
 }
 
 // FetchAllAgentUUIDs retrieves list of all registered agent UUIDs from registrar
-func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
-	resp, err := s.Registrar.Get("agents")
+func (s *Service) FetchAllAgentUUIDs(ctx context.Context) ([]string, error) {
+	resp, err := s.Registrar.Get(ctx, "agents")
 	if err != nil {
 		log.Printf("Error fetching agents: %v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	var agents AgentListResponse
 	err = json.NewDecoder(resp.Body).Decode(&agents)
@@ -58,12 +63,15 @@ func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
 }
 
 // PrepareEnrollmentBody fetches registrar details and returns the enrollment body ready for POST to the verifier.
-func (s *Service) PrepareEnrollmentBody(agentUUID, runtimePolicyName, mbPolicyName string) (map[string]any, error) {
-	regResp, err := s.Registrar.Get(fmt.Sprintf("agents/%s", agentUUID))
+func (s *Service) PrepareEnrollmentBody(ctx context.Context, agentUUID, runtimePolicyName, mbPolicyName string) (map[string]any, error) {
+	regResp, err := s.Registrar.Get(ctx, fmt.Sprintf("agents/%s", agentUUID))
 	if err != nil {
 		return nil, fmt.Errorf("agent not found in registrar: %w", err)
 	}
-	defer regResp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, regResp.Body)
+		_ = regResp.Body.Close()
+	}()
 
 	var regDetails RegistrarGetAgentDetailsOutput
 	if err := json.NewDecoder(regResp.Body).Decode(&regDetails); err != nil {
@@ -72,11 +80,14 @@ func (s *Service) PrepareEnrollmentBody(agentUUID, runtimePolicyName, mbPolicyNa
 
 	runtimePolicyB64 := ""
 	if runtimePolicyName != "" {
-		policyResp, err := s.Verifier.Get(fmt.Sprintf("allowlists/%s", runtimePolicyName))
+		policyResp, err := s.Verifier.Get(ctx, fmt.Sprintf("allowlists/%s", runtimePolicyName))
 		if err != nil {
 			return nil, fmt.Errorf("runtime policy %q not found: %w", runtimePolicyName, err)
 		}
-		defer policyResp.Body.Close()
+		defer func() {
+			_, _ = io.Copy(io.Discard, policyResp.Body)
+			_ = policyResp.Body.Close()
+		}()
 
 		var policyData GetRuntimePolicyOutput
 		if err := json.NewDecoder(policyResp.Body).Decode(&policyData); err != nil {
@@ -121,13 +132,16 @@ func (s *Service) PrepareEnrollmentBody(agentUUID, runtimePolicyName, mbPolicyNa
 }
 
 // FetchAgentDetails retrieves detailed status information for a specific agent
-func (s *Service) FetchAgentDetails(agentUUID string) (AgentStatusResponse, error) {
-	resp, err := s.Verifier.Get(fmt.Sprintf("agents/%s", agentUUID))
+func (s *Service) FetchAgentDetails(ctx context.Context, agentUUID string) (AgentStatusResponse, error) {
+	resp, err := s.Verifier.Get(ctx, fmt.Sprintf("agents/%s", agentUUID))
 	if err != nil {
 		log.Printf("Error fetching agent status: %v", err)
 		return AgentStatusResponse{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	var agentStatus AgentStatusResponse
 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
