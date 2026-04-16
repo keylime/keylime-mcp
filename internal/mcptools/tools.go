@@ -111,6 +111,7 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 	workers.SetLimit(10) // 10 was choosed as compromise between performance and resource usage
 
 	for _, agentUUID := range uuids {
+		agentUUID := agentUUID // capture loop variable for safe use in goroutine
 		workers.Go(func() error {
 			agentStatus, err := h.service.FetchAgentDetails(ctx, agentUUID)
 			if err != nil || agentStatus.Code < 200 || agentStatus.Code >= 300 {
