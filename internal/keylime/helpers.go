@@ -7,8 +7,44 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"strings"
 )
+
+// ExtractAPIError reads a limited portion of the response body and returns a descriptive error.
+func ExtractAPIError(resp *http.Response) error {
+	const maxErrorBody = 16 * 1024 // 16KB limit to prevent OOM on large error payloads
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+	var apiErr struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(bodyBytes, &apiErr); err == nil && apiErr.Status != "" {
+		return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, apiErr.Status)
+	}
+	return fmt.Errorf("API request failed with HTTP %d: %s", resp.StatusCode, sanitizeErrorBody(bodyBytes))
+}
+
+// sanitizeErrorBody truncates and strips non-printable characters from raw
+// response bodies so that error messages remain readable and bounded.
+func sanitizeErrorBody(body []byte) string {
+	const maxPreview = 512
+	truncated := false
+	if len(body) > maxPreview {
+		body = body[:maxPreview]
+		truncated = true
+	}
+	clean := make([]byte, 0, len(body))
+	for _, b := range body {
+		if b >= 0x20 && b < 0x7f || b == '\n' || b == '\t' {
+			clean = append(clean, b)
+		}
+	}
+	s := string(clean)
+	if truncated {
+		s += "... (truncated)"
+	}
+	return s
+}
 
 // Service handles Keylime operations with verifier and registrar clients
 type Service struct {
@@ -48,6 +84,10 @@ func (s *Service) FetchAllAgentUUIDs(ctx context.Context) ([]string, error) {
 		_ = resp.Body.Close()
 	}()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, ExtractAPIError(resp)
+	}
+
 	var agents AgentListResponse
 	err = json.NewDecoder(resp.Body).Decode(&agents)
 	if err != nil {
@@ -73,6 +113,10 @@ func (s *Service) PrepareEnrollmentBody(ctx context.Context, agentUUID, runtimeP
 		_ = regResp.Body.Close()
 	}()
 
+	if regResp.StatusCode < 200 || regResp.StatusCode >= 300 {
+		return nil, fmt.Errorf("agent %s: %w", agentUUID, ExtractAPIError(regResp))
+	}
+
 	var regDetails RegistrarGetAgentDetailsOutput
 	if err := json.NewDecoder(regResp.Body).Decode(&regDetails); err != nil {
 		return nil, fmt.Errorf("failed to decode registrar response: %w", err)
@@ -88,6 +132,10 @@ func (s *Service) PrepareEnrollmentBody(ctx context.Context, agentUUID, runtimeP
 			_, _ = io.Copy(io.Discard, policyResp.Body)
 			_ = policyResp.Body.Close()
 		}()
+
+		if policyResp.StatusCode < 200 || policyResp.StatusCode >= 300 {
+			return nil, fmt.Errorf("runtime policy %q: %w", runtimePolicyName, ExtractAPIError(policyResp))
+		}
 
 		var policyData GetRuntimePolicyOutput
 		if err := json.NewDecoder(policyResp.Body).Decode(&policyData); err != nil {
@@ -142,6 +190,10 @@ func (s *Service) FetchAgentDetails(ctx context.Context, agentUUID string) (Agen
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return AgentStatusResponse{}, fmt.Errorf("agent %s: %w", agentUUID, ExtractAPIError(resp))
+	}
 
 	var agentStatus AgentStatusResponse
 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)

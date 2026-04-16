@@ -55,7 +55,7 @@ func (h *ToolHandler) GetVerifierEnrolledAgents(ctx context.Context, req *mcp.Ca
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, extractAPIError(resp)
+		return nil, nil, keylime.ExtractAPIError(resp)
 	}
 
 	var parsed struct {
@@ -408,7 +408,7 @@ func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, extractAPIError(resp)
+		return nil, nil, keylime.ExtractAPIError(resp)
 	}
 
 	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
@@ -438,7 +438,7 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}()
 
 	if getResp.StatusCode < 200 || getResp.StatusCode >= 300 {
-		return nil, nil, extractAPIError(getResp)
+		return nil, nil, keylime.ExtractAPIError(getResp)
 	}
 
 	var policyData keylime.GetRuntimePolicyOutput
@@ -540,7 +540,7 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	}()
 
 	if reuploadResp.StatusCode < 200 || reuploadResp.StatusCode >= 300 {
-		return nil, nil, extractAPIError(reuploadResp)
+		return nil, nil, keylime.ExtractAPIError(reuploadResp)
 	}
 
 	return nil, keylime.UpdateRuntimePolicyOutput{PolicyName: input.PolicyName, Status: "updated"}, nil
@@ -619,7 +619,7 @@ func (h *ToolHandler) ImportMBPolicy(ctx context.Context, req *mcp.CallToolReque
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, extractAPIError(resp)
+		return nil, nil, keylime.ExtractAPIError(resp)
 	}
 
 	return nil, keylime.ImportMBPolicyOutput{Name: input.Name, Status: "imported"}, nil
