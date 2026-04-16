@@ -54,7 +54,7 @@ type Config struct {
 
 type Client struct {
 	baseURL    string
-	apiVersion string
+	APIVersion string
 	httpClient *http.Client
 }
 
@@ -154,4 +154,205 @@ type GetAgentPoliciesOutput struct {
 	AcceptedTPMHashAlgs       []string `json:"accepted_tpm_hash_algs"`
 	AcceptedTPMEncryptionAlgs []string `json:"accepted_tpm_encryption_algs"`
 	AcceptedTPMSigningAlgs    []string `json:"accepted_tpm_signing_algs"`
+}
+
+type RegistrarGetAgentDetailsInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type RegistrarGetAgentDetailsOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		AikTpm   string `json:"aik_tpm"`
+		EkTpm    string `json:"ek_tpm"`
+		Ekcert   string `json:"ekcert"`
+		MtlsCert string `json:"mtls_cert"`
+		IP       string `json:"ip"`
+		Port     int    `json:"port"`
+		Regcount int    `json:"regcount"`
+	} `json:"results"`
+}
+
+type GetVersionAndHealthInput struct{}
+
+type GetVersionOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		CurrentVersion    string   `json:"current_version"`
+		SupportedVersions []string `json:"supported_versions"`
+	} `json:"results"`
+}
+
+type ServiceStatus struct {
+	Service           string   `json:"service"`
+	Reachable         bool     `json:"reachable"`
+	CurrentVersion    string   `json:"current_version"`
+	SupportedVersions []string `json:"supported_versions"`
+	Error             string   `json:"error,omitempty"`
+}
+
+type GetVersionAndHealthOutput struct {
+	Services []ServiceStatus `json:"services"`
+}
+
+type RegistrarRemoveAgentInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type RegistrarRemoveAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type EnrollAgentToVerifierInput struct {
+	AgentUUID         string `json:"agent_uuid"`
+	RuntimePolicyName string `json:"runtime_policy_name"`
+	MbPolicyName      string `json:"mb_policy_name"`
+}
+
+type EnrollAgentToVerifierOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type UnenrollAgentFromVerifierInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type UnenrollAgentFromVerifierOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type UpdateAgentInput struct {
+	AgentUUID         string `json:"agent_uuid"`
+	RuntimePolicyName string `json:"runtime_policy_name"`
+	MbPolicyName      string `json:"mb_policy_name"`
+}
+
+type UpdateAgentOutput struct {
+	AgentUUID string `json:"agent_uuid"`
+	Status    string `json:"status"`
+}
+
+type StopAgentInput struct {
+	AgentUUID string `json:"agent_uuid"`
+}
+
+type StopAgentOutput struct {
+	Code    int      `json:"code"`
+	Status  string   `json:"status"`
+	Results struct{} `json:"results"`
+}
+
+type GetVerifierEnrolledAgentsInput struct{}
+
+type GetVerifierEnrolledAgentsOutput struct {
+	Agents []string `json:"agents"`
+}
+
+type ListRuntimePoliciesInput struct{}
+
+type ListRuntimePoliciesOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		RuntimePolicyNames []string `json:"runtimepolicy names"`
+	} `json:"results"`
+}
+
+type ImportRuntimePolicyInput struct {
+	Name     string `json:"name"`
+	FilePath string `json:"file_path"`
+}
+
+type ImportRuntimePolicyOutput struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type GetRuntimePolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type GetRuntimePolicyOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		Name          string `json:"name"`
+		TPMPolicy     string `json:"tpm_policy"`
+		RuntimePolicy string `json:"runtime_policy"`
+	} `json:"results"`
+}
+
+type UpdateRuntimePolicyInput struct {
+	PolicyName     string            `json:"policy_name"`
+	AddExcludes    []string          `json:"add_excludes"`
+	RemoveExcludes []string          `json:"remove_excludes"`
+	AddDigests     map[string]string `json:"add_digests"`
+	RemoveDigests  []string          `json:"remove_digests"`
+}
+
+type UpdateRuntimePolicyOutput struct {
+	PolicyName string `json:"policy_name"`
+	Status     string `json:"status"`
+}
+
+type DeleteRuntimePolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type DeletePolicyOutput struct {
+	PolicyName string `json:"policy_name"`
+	Status     string `json:"status"`
+}
+
+type ListMBPoliciesInput struct{}
+
+type ListMBPoliciesOutput struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		MBPolicyNames []string `json:"mbpolicy names"`
+	} `json:"results"`
+}
+
+type GetMBPolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type GetMBPolicyOutput struct {
+	Code    int            `json:"code"`
+	Status  string         `json:"status"`
+	Results map[string]any `json:"results"`
+}
+
+type ImportMBPolicyInput struct {
+	Name     string `json:"name"`
+	FilePath string `json:"file_path"`
+}
+
+type ImportMBPolicyOutput struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type DeleteMBPolicyInput struct {
+	PolicyName string `json:"policy_name"`
+}
+
+type InvestigateVerifierLogsInput struct {
+	Lines     int    `json:"lines"`
+	AgentUUID string `json:"agent_uuid"`
+	Filter    string `json:"filter"`
+}
+
+type InvestigateVerifierLogsOutput struct {
+	Logs          string `json:"logs"`
+	FilterApplied string `json:"filter_applied"`
 }

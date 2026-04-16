@@ -54,6 +54,12 @@ linters:
         - name: var-naming
         - name: package-comments
           disabled: true
+  exclusions:
+    rules:
+      # fetchAndDecode closes resp.Body but linter can't trace it through generics
+      - path: internal/mcptools/tools\.go
+        linters:
+          - bodyclose
 
 formatters:
   enable:

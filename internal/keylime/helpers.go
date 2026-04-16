@@ -1,9 +1,13 @@
 package keylime
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"strings"
 )
 
 // Service handles Keylime operations with verifier and registrar clients
@@ -28,14 +32,21 @@ func NewService(config *Config) (*Service, error) {
 	}, nil
 }
 
+func IsFailedState(state int) bool {
+	return state == StateFailed || state == StateInvalidQuote || state == StateTenantFailed
+}
+
 // FetchAllAgentUUIDs retrieves list of all registered agent UUIDs from registrar
-func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
-	resp, err := s.Registrar.Get("agents")
+func (s *Service) FetchAllAgentUUIDs(ctx context.Context) ([]string, error) {
+	resp, err := s.Registrar.Get(ctx, "agents")
 	if err != nil {
 		log.Printf("Error fetching agents: %v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	var agents AgentListResponse
 	err = json.NewDecoder(resp.Body).Decode(&agents)
@@ -51,14 +62,86 @@ func (s *Service) FetchAllAgentUUIDs() ([]string, error) {
 	return agents.Results.UUIDs, nil
 }
 
+// PrepareEnrollmentBody fetches registrar details and returns the enrollment body ready for POST to the verifier.
+func (s *Service) PrepareEnrollmentBody(ctx context.Context, agentUUID, runtimePolicyName, mbPolicyName string) (map[string]any, error) {
+	regResp, err := s.Registrar.Get(ctx, fmt.Sprintf("agents/%s", agentUUID))
+	if err != nil {
+		return nil, fmt.Errorf("agent not found in registrar: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, regResp.Body)
+		_ = regResp.Body.Close()
+	}()
+
+	var regDetails RegistrarGetAgentDetailsOutput
+	if err := json.NewDecoder(regResp.Body).Decode(&regDetails); err != nil {
+		return nil, fmt.Errorf("failed to decode registrar response: %w", err)
+	}
+
+	runtimePolicyB64 := ""
+	if runtimePolicyName != "" {
+		policyResp, err := s.Verifier.Get(ctx, fmt.Sprintf("allowlists/%s", runtimePolicyName))
+		if err != nil {
+			return nil, fmt.Errorf("runtime policy %q not found: %w", runtimePolicyName, err)
+		}
+		defer func() {
+			_, _ = io.Copy(io.Discard, policyResp.Body)
+			_ = policyResp.Body.Close()
+		}()
+
+		var policyData GetRuntimePolicyOutput
+		if err := json.NewDecoder(policyResp.Body).Decode(&policyData); err != nil {
+			return nil, fmt.Errorf("failed to decode runtime policy %q: %w", runtimePolicyName, err)
+		}
+		if policyData.Results.RuntimePolicy != "" {
+			runtimePolicyB64 = base64.StdEncoding.EncodeToString([]byte(policyData.Results.RuntimePolicy))
+		}
+	}
+
+	tpmMask := 0
+	if runtimePolicyName != "" {
+		tpmMask |= 1 << 10 // IMA_PCR: runtime policy requires PCR 10 monitoring
+	}
+	if mbPolicyName != "" {
+		for _, pcr := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15} {
+			tpmMask |= 1 << pcr // MEASUREDBOOT_PCRS
+		}
+	}
+	tpmPolicy := fmt.Sprintf(`{"mask":"%#x"}`, tpmMask)
+
+	return map[string]any{
+		"v":                          nil,
+		"cloudagent_ip":              regDetails.Results.IP,
+		"cloudagent_port":            regDetails.Results.Port,
+		"tpm_policy":                 tpmPolicy,
+		"runtime_policy":             runtimePolicyB64,
+		"runtime_policy_name":        "",
+		"runtime_policy_key":         "",
+		"mb_policy":                  "",
+		"mb_policy_name":             mbPolicyName,
+		"ima_sign_verification_keys": "",
+		"metadata":                   "{}",
+		"revocation_key":             "",
+		"accept_tpm_hash_algs":       []string{"sha256", "sha384", "sha512"},
+		"accept_tpm_encryption_algs": []string{"rsa"},
+		"accept_tpm_signing_algs":    []string{"rsassa"},
+		"ak_tpm":                     regDetails.Results.AikTpm,
+		"mtls_cert":                  regDetails.Results.MtlsCert,
+		"supported_version":          strings.TrimPrefix(s.Verifier.APIVersion, "v"),
+	}, nil
+}
+
 // FetchAgentDetails retrieves detailed status information for a specific agent
-func (s *Service) FetchAgentDetails(agentUUID string) (AgentStatusResponse, error) {
-	resp, err := s.Verifier.Get(fmt.Sprintf("agents/%s", agentUUID))
+func (s *Service) FetchAgentDetails(ctx context.Context, agentUUID string) (AgentStatusResponse, error) {
+	resp, err := s.Verifier.Get(ctx, fmt.Sprintf("agents/%s", agentUUID))
 	if err != nil {
 		log.Printf("Error fetching agent status: %v", err)
 		return AgentStatusResponse{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	var agentStatus AgentStatusResponse
 	err = json.NewDecoder(resp.Body).Decode(&agentStatus)
@@ -68,68 +151,4 @@ func (s *Service) FetchAgentDetails(agentUUID string) (AgentStatusResponse, erro
 	}
 
 	return agentStatus, nil
-}
-
-// MapAgentToOutput converts API response to standardized output format
-func MapAgentToOutput(agentUUID string, agentStatus AgentStatusResponse) GetAgentStatusOutput {
-	return GetAgentStatusOutput{
-		AgentUUID:                   agentUUID,
-		OperationalState:            agentStatus.Results.OperationalState,
-		OperationalStateDescription: StateToString(agentStatus.Results.OperationalState),
-		AttestationCount:            agentStatus.Results.AttestationCount,
-		LastReceivedQuote:           agentStatus.Results.LastReceivedQuote,
-		LastSuccessfulAttestation:   agentStatus.Results.LastSuccessfulAttestation,
-		SeverityLevel:               agentStatus.Results.SeverityLevel,
-		LastEventID:                 agentStatus.Results.LastEventID,
-		HashAlgorithm:               agentStatus.Results.HashAlg,
-		EncryptionAlgorithm:         agentStatus.Results.EncAlg,
-		SigningAlgorithm:            agentStatus.Results.SignAlg,
-		VerifierID:                  agentStatus.Results.VerifierID,
-		VerifierAddress:             fmt.Sprintf("%s:%d", agentStatus.Results.VerifierIP, agentStatus.Results.VerifierPort),
-		HasMeasuredBoot:             agentStatus.Results.HasMbRefstate != 0,
-		HasRuntimePolicy:            agentStatus.Results.HasRuntimePolicy != 0,
-	}
-}
-
-func MapAgentToPolicies(agentUUID string, agentStatus AgentStatusResponse) GetAgentPoliciesOutput {
-	// Ensure slices are never nil
-	hashAlgs := agentStatus.Results.AcceptTPMHashAlgs
-	if hashAlgs == nil {
-		hashAlgs = []string{}
-	}
-	encAlgs := agentStatus.Results.AcceptTPMEncryptionAlgs
-	if encAlgs == nil {
-		encAlgs = []string{}
-	}
-	signAlgs := agentStatus.Results.AcceptTPMSigningAlgs
-	if signAlgs == nil {
-		signAlgs = []string{}
-	}
-
-	return GetAgentPoliciesOutput{
-		AgentUUID:                 agentUUID,
-		TPMPolicy:                 parseJSONString(agentStatus.Results.TPMPolicy),
-		VTPMPolicy:                parseJSONString(agentStatus.Results.VTPMPolicy),
-		MetaData:                  parseJSONString(agentStatus.Results.MetaData),
-		HasMeasuredBootPolicy:     agentStatus.Results.HasMbRefstate != 0,
-		HasRuntimePolicy:          agentStatus.Results.HasRuntimePolicy != 0,
-		AcceptedTPMHashAlgs:       hashAlgs,
-		AcceptedTPMEncryptionAlgs: encAlgs,
-		AcceptedTPMSigningAlgs:    signAlgs,
-	}
-}
-
-// parseJSONString converts a JSON string into a proper Go interface
-func parseJSONString(jsonStr string) any {
-	if jsonStr == "" {
-		return map[string]any{}
-	}
-
-	var result any
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		log.Printf("Warning: Invalid JSON string: %v", err)
-		return map[string]any{}
-	}
-
-	return result
 }
