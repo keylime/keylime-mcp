@@ -133,7 +133,7 @@ func (h *ToolHandler) GetFailedAgents(ctx context.Context, req *mcp.CallToolRequ
 	return nil, keylime.GetFailedAgentsOutput{FailedAgents: failed}, nil
 }
 
-func (h *ToolHandler) AgentPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentPoliciesInput) (
+func (h *ToolHandler) GetAgentPolicies(ctx context.Context, req *mcp.CallToolRequest, input keylime.GetAgentPoliciesInput) (
 	*mcp.CallToolResult,
 	any,
 	error,

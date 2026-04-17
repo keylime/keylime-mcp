@@ -1,10 +1,4 @@
-.PHONY: help build build-server run start check-deps setup-certs install clean
-
-PODMAN := $(shell command -v podman 2>/dev/null)
-
-ifeq ($(PODMAN),)
-$(error Podman not found. Install: sudo dnf install podman podman-compose)
-endif
+.PHONY: help build build-server run start check-deps setup-certs install clean test test-race
 
 help:
 	@echo "Keylime MCP"
@@ -19,6 +13,10 @@ help:
 	@echo "  make build        - Build everything (server + client)"
 	@echo "  make run          - Build and run"
 	@echo "  make start        - Run pre-built binary (no compilation)"
+	@echo ""
+	@echo "Tests:"
+	@echo "  make test         - Run server tests"
+	@echo "  make test-race    - Run server tests with race detector"
 
 .env:
 	@if [ ! -f .env ]; then \
@@ -69,3 +67,11 @@ install: setup-certs check-deps .env build
 
 clean:
 	rm -rf bin/*
+
+# Tests
+
+test:
+	go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -count=1
+
+test-race:
+	go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -race -count=1

@@ -1,0 +1,9 @@
+{
+  "code": 200,
+  "status": "Success",
+  "results": {
+    "name": "test-policy",
+    "tpm_policy": "",
+    "runtime_policy": "{\"meta\":{\"version\":5,\"timestamp\":\"2024-01-01T00:00:00Z\"},\"digests\":{\"/bin/bash\":[\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"]},\"excludes\":[\"/tmp(/.*)?\"],\"keyrings\":{}}"
+  }
+}

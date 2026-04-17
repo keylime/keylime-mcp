@@ -1,0 +1,29 @@
+{
+  "code": 200,
+  "status": "Success",
+  "results": {
+    "operational_state": 9,
+    "v": "",
+    "ip": "192.168.1.101",
+    "port": 9002,
+    "tpm_policy": "{}",
+    "vtpm_policy": "{}",
+    "meta_data": "{}",
+    "has_mb_refstate": 0,
+    "has_runtime_policy": 0,
+    "accept_tpm_hash_algs": ["sha256"],
+    "accept_tpm_encryption_algs": ["rsa"],
+    "accept_tpm_signing_algs": ["rsassa"],
+    "hash_alg": "sha256",
+    "enc_alg": "rsa",
+    "sign_alg": "rsassa",
+    "verifier_id": "default",
+    "verifier_ip": "127.0.0.1",
+    "verifier_port": 8881,
+    "severity_level": null,
+    "last_event_id": null,
+    "attestation_count": 5,
+    "last_received_quote": 1700000000,
+    "last_successful_attestation": null
+  }
+}
