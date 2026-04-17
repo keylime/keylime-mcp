@@ -1,0 +1,13 @@
+{
+  "code": 200,
+  "status": "Success",
+  "results": {
+    "aik_tpm": "test-aik-data",
+    "ek_tpm": "test-ek-data",
+    "ekcert": "test-ek-cert",
+    "mtls_cert": "test-mtls-cert",
+    "ip": "192.168.1.100",
+    "port": 9002,
+    "regcount": 1
+  }
+}

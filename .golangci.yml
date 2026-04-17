@@ -42,6 +42,7 @@ linters:
         - (io.Closer).Close
     gosec:
       excludes:
+        - G104
         - G706
     revive:
       rules:
@@ -60,6 +61,10 @@ linters:
       - path: internal/mcptools/tools\.go
         linters:
           - bodyclose
+      # test functions for different tools are structurally similar by design
+      - path: _test\.go
+        linters:
+          - dupl
 
 formatters:
   enable:
