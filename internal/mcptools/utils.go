@@ -14,19 +14,6 @@ import (
 	"github.com/keylime/keylime-mcp/internal/keylime"
 )
 
-// extractAPIError reads a limited portion of the response body and returns a descriptive error.
-func extractAPIError(resp *http.Response) error {
-	const maxErrorBody = 16 * 1024 // 16KB limit to prevent OOM on large error payloads
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-	var apiErr struct {
-		Status string `json:"status"`
-	}
-	if err := json.Unmarshal(bodyBytes, &apiErr); err == nil && apiErr.Status != "" {
-		return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, apiErr.Status)
-	}
-	return fmt.Errorf("API request failed with HTTP %d: %s", resp.StatusCode, string(bodyBytes))
-}
-
 // fetchAndDecode reads an HTTP response body and decodes it into a typed struct.
 // It drains any unread bytes before closing to ensure HTTP connection reuse.
 func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
@@ -39,7 +26,7 @@ func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return zero, extractAPIError(resp)
+		return zero, keylime.ExtractAPIError(resp)
 	}
 	var result T
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -58,7 +45,7 @@ func deleteAndCheck(resp *http.Response, err error) error {
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return extractAPIError(resp)
+		return keylime.ExtractAPIError(resp)
 	}
 	return nil
 }
