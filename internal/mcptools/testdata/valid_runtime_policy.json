@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "version": 5,
+    "generator": "test",
+    "timestamp": "2024-01-01T00:00:00Z"
+  },
+  "release": 0,
+  "digests": {
+    "/bin/bash": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]
+  },
+  "excludes": ["/tmp(/.*)?"],
+  "keyrings": {}
+}

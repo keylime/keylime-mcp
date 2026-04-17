@@ -1,0 +1,8 @@
+{
+  "code": 200,
+  "status": "Success",
+  "results": {
+    "current_version": "2.5",
+    "supported_versions": ["2.4", "2.5"]
+  }
+}

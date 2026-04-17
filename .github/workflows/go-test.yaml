@@ -1,0 +1,30 @@
+---
+name: go-test
+
+"on":
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.sh'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Go
+        run: dnf -y install golang
+
+      - name: Run tests
+        run: go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -race -count=1
+
+    container:
+      image: fedora:latest
+      env:
+        GOPATH: /root/go
+        PATH: /root/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
