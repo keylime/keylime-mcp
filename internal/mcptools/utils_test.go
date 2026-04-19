@@ -301,46 +301,6 @@ func TestMapAgentToOutput(t *testing.T) {
 	})
 }
 
-func TestExtractAPIError(t *testing.T) {
-	t.Run("json with status field", func(t *testing.T) {
-		resp := &http.Response{
-			StatusCode: 404,
-			Body:       io.NopCloser(strings.NewReader(`{"status":"agent not found"}`)),
-		}
-		err := extractAPIError(resp)
-		assert.EqualError(t, err, "API error (HTTP 404): agent not found")
-	})
-
-	t.Run("non-json body", func(t *testing.T) {
-		resp := &http.Response{
-			StatusCode: 500,
-			Body:       io.NopCloser(strings.NewReader("Internal Server Error")),
-		}
-		err := extractAPIError(resp)
-		assert.EqualError(t, err, "API request failed with HTTP 500: Internal Server Error")
-	})
-
-	t.Run("json without status field", func(t *testing.T) {
-		resp := &http.Response{
-			StatusCode: 500,
-			Body:       io.NopCloser(strings.NewReader(`{"error":"something broke"}`)),
-		}
-		err := extractAPIError(resp)
-		assert.Contains(t, err.Error(), "API request failed with HTTP 500")
-	})
-
-	t.Run("large body does not OOM", func(t *testing.T) {
-		resp := &http.Response{
-			StatusCode: 500,
-			Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", 20*1024))),
-		}
-		err := extractAPIError(resp)
-		assert.Error(t, err)
-		// truncated at 16KB
-		assert.Less(t, len(err.Error()), 20*1024)
-	})
-}
-
 func TestFetchAndDecode(t *testing.T) {
 	type testResult struct {
 		Code   int    `json:"code"`

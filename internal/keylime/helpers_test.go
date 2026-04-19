@@ -2,7 +2,9 @@ package keylime
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,16 +72,15 @@ func TestFetchAgentDetails(t *testing.T) {
 		assert.True(t, IsFailedState(status.Results.OperationalState))
 	})
 
-	t.Run("non-200 response decoded with zero code", func(t *testing.T) {
+	t.Run("non-200 response returns error", func(t *testing.T) {
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"status":"agent not found"}`))
 		}))
 
-		// FetchAgentDetails does not check HTTP status; 404 with valid JSON decodes to Code=0.
-		status, err := svc.FetchAgentDetails(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
-		require.NoError(t, err)
-		assert.Equal(t, 0, status.Code)
+		_, err := svc.FetchAgentDetails(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "agent not found")
 	})
 
 	t.Run("invalid json returns error", func(t *testing.T) {
@@ -163,5 +164,76 @@ func TestPrepareEnrollmentBody(t *testing.T) {
 
 		_, err := svc.PrepareEnrollmentBody(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", "", "")
 		assert.Error(t, err)
+	})
+}
+
+func TestSanitizeErrorBody(t *testing.T) {
+	t.Run("short printable body unchanged", func(t *testing.T) {
+		assert.Equal(t, "hello world", sanitizeErrorBody([]byte("hello world")))
+	})
+
+	t.Run("strips non-printable characters", func(t *testing.T) {
+		assert.Equal(t, "hello", sanitizeErrorBody([]byte("he\x00ll\x01o")))
+	})
+
+	t.Run("preserves newlines and tabs", func(t *testing.T) {
+		assert.Equal(t, "line1\nline2\tend", sanitizeErrorBody([]byte("line1\nline2\tend")))
+	})
+
+	t.Run("truncates at 512 bytes", func(t *testing.T) {
+		long := strings.Repeat("a", 600)
+		result := sanitizeErrorBody([]byte(long))
+		assert.Contains(t, result, "... (truncated)")
+		assert.LessOrEqual(t, len(result), 512+len("... (truncated)"))
+	})
+
+	t.Run("empty body", func(t *testing.T) {
+		assert.Equal(t, "", sanitizeErrorBody([]byte{}))
+	})
+
+	t.Run("exactly 512 bytes not truncated", func(t *testing.T) {
+		exact := strings.Repeat("a", 512)
+		result := sanitizeErrorBody([]byte(exact))
+		assert.NotContains(t, result, "truncated")
+		assert.Equal(t, 512, len(result))
+	})
+}
+
+func TestExtractAPIError(t *testing.T) {
+	t.Run("json with status field", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: 404,
+			Body:       io.NopCloser(strings.NewReader(`{"status":"agent not found"}`)),
+		}
+		err := ExtractAPIError(resp)
+		assert.EqualError(t, err, "API error (HTTP 404): agent not found")
+	})
+
+	t.Run("non-json body", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: 500,
+			Body:       io.NopCloser(strings.NewReader("Internal Server Error")),
+		}
+		err := ExtractAPIError(resp)
+		assert.EqualError(t, err, "API request failed with HTTP 500: Internal Server Error")
+	})
+
+	t.Run("json without status field", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: 500,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"something broke"}`)),
+		}
+		err := ExtractAPIError(resp)
+		assert.Contains(t, err.Error(), "API request failed with HTTP 500")
+	})
+
+	t.Run("large body does not OOM", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: 500,
+			Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", 20*1024))),
+		}
+		err := ExtractAPIError(resp)
+		assert.Error(t, err)
+		assert.Less(t, len(err.Error()), 20*1024)
 	})
 }
