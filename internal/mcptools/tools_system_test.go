@@ -14,9 +14,10 @@ import (
 
 func TestGetVersionAndHealth(t *testing.T) {
 	t.Run("both reachable", func(t *testing.T) {
+		data := loadTestdata(t, "version.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "version.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -40,8 +41,9 @@ func TestGetVersionAndHealth(t *testing.T) {
 		downServer := httptest.NewServer(http.NotFoundHandler())
 		downServer.Close()
 
+		versionData := loadTestdata(t, "version.json")
 		upServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "version.json"))
+			w.Write(versionData)
 		}))
 		t.Cleanup(upServer.Close)
 

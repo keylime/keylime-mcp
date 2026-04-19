@@ -2,6 +2,7 @@ package mcptools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +16,9 @@ import (
 
 func TestGetAllAgents(t *testing.T) {
 	t.Run("returns uuid list", func(t *testing.T) {
+		data := loadTestdata(t, "agent_list.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_list.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.GetAllAgents(context.Background(), nil, keylime.GetAllAgentsInput{})
@@ -44,9 +46,10 @@ func TestGetAllAgents(t *testing.T) {
 
 func TestGetVerifierEnrolledAgents(t *testing.T) {
 	t.Run("returns flattened uuid list", func(t *testing.T) {
+		data := loadTestdata(t, "enrolled_agents.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "enrolled_agents.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -90,8 +93,9 @@ func TestGetVerifierEnrolledAgents(t *testing.T) {
 
 func TestGetAgentStatus(t *testing.T) {
 	t.Run("valid uuid returns status", func(t *testing.T) {
+		data := loadTestdata(t, "agent_status.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_status.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.GetAgentStatus(context.Background(), nil, keylime.GetAgentStatusInput{
@@ -109,7 +113,7 @@ func TestGetAgentStatus(t *testing.T) {
 
 	t.Run("invalid uuid rejected before HTTP call", func(t *testing.T) {
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			t.Fatal("HTTP should not be called for invalid UUID")
+			t.Error("HTTP should not be called for invalid UUID")
 		}))
 
 		_, _, err := h.GetAgentStatus(context.Background(), nil, keylime.GetAgentStatusInput{
@@ -135,6 +139,9 @@ func TestGetFailedAgents(t *testing.T) {
 	)
 
 	t.Run("returns only failed agents", func(t *testing.T) {
+		statusHealthy := loadTestdata(t, "agent_status.json")
+		statusFailed := loadTestdata(t, "agent_status_failed.json")
+		statusInvalid := loadTestdata(t, "agent_status_invalid_quote.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w,
@@ -146,11 +153,14 @@ func TestGetFailedAgents(t *testing.T) {
 			uuid := r.PathValue("uuid")
 			switch uuid {
 			case uuid1:
-				w.Write(loadTestdata(t, "agent_status.json")) // state 3
+				w.Write(statusHealthy)
 			case uuid2:
-				w.Write(loadTestdata(t, "agent_status_failed.json")) // state 7
+				w.Write(statusFailed)
 			case uuid3:
-				w.Write(loadTestdata(t, "agent_status_invalid_quote.json")) // state 9
+				w.Write(statusInvalid)
+			default:
+				t.Errorf("unexpected uuid: %s", uuid)
+				http.Error(w, "unexpected uuid", http.StatusInternalServerError)
 			}
 		})
 		h := newTestHandler(t, mux)
@@ -182,6 +192,7 @@ func TestGetFailedAgents(t *testing.T) {
 	})
 
 	t.Run("all healthy returns empty", func(t *testing.T) {
+		statusData := loadTestdata(t, "agent_status.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w,
@@ -189,7 +200,7 @@ func TestGetFailedAgents(t *testing.T) {
 			)
 		})
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_status.json")) // state 3 = healthy
+			w.Write(statusData)
 		})
 		h := newTestHandler(t, mux)
 
@@ -201,6 +212,7 @@ func TestGetFailedAgents(t *testing.T) {
 	})
 
 	t.Run("agent not enrolled in verifier skipped gracefully", func(t *testing.T) {
+		failedData := loadTestdata(t, "agent_status_failed.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w,
@@ -214,7 +226,7 @@ func TestGetFailedAgents(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 				w.Write([]byte(`{"code":404,"status":"agent not found"}`))
 			} else {
-				w.Write(loadTestdata(t, "agent_status_failed.json"))
+				w.Write(failedData)
 			}
 		})
 		h := newTestHandler(t, mux)
@@ -229,9 +241,10 @@ func TestGetFailedAgents(t *testing.T) {
 
 func TestReactivateAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		data := loadTestdata(t, "success.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodPut, r.Method)
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.ReactivateAgent(context.Background(), nil, keylime.ReactivateAgentInput{
@@ -254,8 +267,9 @@ func TestReactivateAgent(t *testing.T) {
 
 func TestGetAgentPolicies(t *testing.T) {
 	t.Run("returns policy fields", func(t *testing.T) {
+		data := loadTestdata(t, "agent_status.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_status.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.GetAgentPolicies(context.Background(), nil, keylime.GetAgentPoliciesInput{
@@ -287,8 +301,9 @@ func TestGetAgentPolicies(t *testing.T) {
 
 func TestRegistrarGetAgentDetails(t *testing.T) {
 	t.Run("returns registrar fields", func(t *testing.T) {
+		data := loadTestdata(t, "registrar_agent_details.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.RegistrarGetAgentDetails(context.Background(), nil, keylime.RegistrarGetAgentDetailsInput{
@@ -315,12 +330,14 @@ func TestRegistrarGetAgentDetails(t *testing.T) {
 
 func TestEnrollAgentToVerifier(t *testing.T) {
 	t.Run("enroll without policies", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		successData := loadTestdata(t, "success.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("POST /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		h := newTestHandler(t, mux)
 
@@ -334,18 +351,21 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 	})
 
 	t.Run("enroll with runtime policy verifies POST body", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		policyData := loadTestdata(t, "runtime_policy.json")
+		successData := loadTestdata(t, "success.json")
 		var enrollBody map[string]any
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("GET /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy.json"))
+			w.Write(policyData)
 		})
 		mux.HandleFunc("POST /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &enrollBody)
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		h := newTestHandler(t, mux)
 
@@ -359,7 +379,11 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 		assert.Equal(t, "192.168.1.100", enrollBody["cloudagent_ip"])
 		assert.Equal(t, "test-aik-data", enrollBody["ak_tpm"])
 		assert.Equal(t, "test-mtls-cert", enrollBody["mtls_cert"])
-		assert.NotEmpty(t, enrollBody["runtime_policy"])      // base64-encoded policy
+		policyB64, ok := enrollBody["runtime_policy"].(string)
+		require.True(t, ok)
+		decoded, err := base64.StdEncoding.DecodeString(policyB64)
+		require.NoError(t, err)
+		assert.True(t, json.Valid(decoded))
 		assert.Contains(t, enrollBody["tpm_policy"], "0x400") // PCR 10
 	})
 
@@ -395,15 +419,17 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 
 func TestUpdateAgent(t *testing.T) {
 	t.Run("successful update", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		successData := loadTestdata(t, "success.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("DELETE /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		mux.HandleFunc("POST /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		h := newTestHandler(t, mux)
 
@@ -418,9 +444,10 @@ func TestUpdateAgent(t *testing.T) {
 	})
 
 	t.Run("unenroll fails", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("DELETE /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -436,12 +463,14 @@ func TestUpdateAgent(t *testing.T) {
 	})
 
 	t.Run("re-enroll fails after unenroll", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		successData := loadTestdata(t, "success.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("DELETE /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		mux.HandleFunc("POST /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -458,6 +487,7 @@ func TestUpdateAgent(t *testing.T) {
 	})
 
 	t.Run("prep failure prevents unenroll", func(t *testing.T) {
+		successData := loadTestdata(t, "success.json")
 		var deleteCalled bool
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
@@ -466,7 +496,7 @@ func TestUpdateAgent(t *testing.T) {
 		})
 		mux.HandleFunc("DELETE /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
 			deleteCalled = true
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(successData)
 		})
 		h := newTestHandler(t, mux)
 
@@ -488,9 +518,10 @@ func TestUpdateAgent(t *testing.T) {
 
 func TestUnenrollAgentFromVerifier(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		data := loadTestdata(t, "success.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodDelete, r.Method)
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.UnenrollAgentFromVerifier(context.Background(), nil, keylime.UnenrollAgentFromVerifierInput{
@@ -513,9 +544,10 @@ func TestUnenrollAgentFromVerifier(t *testing.T) {
 
 func TestStopAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		data := loadTestdata(t, "success.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodPut, r.Method)
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.StopAgent(context.Background(), nil, keylime.StopAgentInput{
@@ -538,9 +570,10 @@ func TestStopAgent(t *testing.T) {
 
 func TestRegistrarRemoveAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		data := loadTestdata(t, "success.json")
 		h := newTestHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodDelete, r.Method)
-			w.Write(loadTestdata(t, "success.json"))
+			w.Write(data)
 		}))
 
 		_, output, err := h.RegistrarRemoveAgent(context.Background(), nil, keylime.RegistrarRemoveAgentInput{

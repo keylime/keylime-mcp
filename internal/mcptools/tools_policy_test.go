@@ -17,9 +17,10 @@ import (
 
 func TestListRuntimePolicies(t *testing.T) {
 	t.Run("returns policy names", func(t *testing.T) {
+		data := loadTestdata(t, "runtime_policy_list.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/allowlists/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy_list.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -33,9 +34,10 @@ func TestListRuntimePolicies(t *testing.T) {
 
 func TestGetRuntimePolicy(t *testing.T) {
 	t.Run("returns policy content", func(t *testing.T) {
+		data := loadTestdata(t, "runtime_policy.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -163,9 +165,10 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 	// serves existing policy on GET, captures PUT body
 	setupMux := func(t *testing.T, capturedBody *map[string]any) *ToolHandler {
 		t.Helper()
+		policyData := loadTestdata(t, "runtime_policy.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy.json"))
+			w.Write(policyData)
 		})
 		mux.HandleFunc("PUT /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
@@ -219,6 +222,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		excludes := policy["excludes"].([]any)
 		// suffix not doubled
 		assert.Contains(t, excludes, "/var/log(/.*)?")
+		assert.NotContains(t, excludes, "/var/log(/.*)?(/.*)?")
 	})
 
 	t.Run("remove excludes", func(t *testing.T) {
@@ -240,7 +244,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		var putBody map[string]any
 		h := setupMux(t, &putBody)
 
-		digest := "a" + "b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		digest := "ab0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b8550"
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
 			PolicyName: "test-policy",
@@ -281,7 +285,9 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 
 		policy := decodePutPolicy(t, putBody)
 		meta := policy["meta"].(map[string]any)
-		assert.NotEqual(t, "2024-01-01T00:00:00Z", meta["timestamp"]) // changed from original
+		ts, ok := meta["timestamp"].(string)
+		require.True(t, ok, "timestamp must be a string")
+		assert.NotEqual(t, "2024-01-01T00:00:00Z", ts)
 	})
 
 	t.Run("no operations returns error", func(t *testing.T) {
@@ -315,7 +321,8 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 			PolicyName:  "nonexistent",
 			AddExcludes: []string{"/var"},
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "404")
 	})
 }
 
@@ -348,9 +355,10 @@ func TestDeleteRuntimePolicy(t *testing.T) {
 
 func TestListMBPolicies(t *testing.T) {
 	t.Run("returns policy names", func(t *testing.T) {
+		data := loadTestdata(t, "mb_policy_list.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/mbpolicies/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "mb_policy_list.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -364,9 +372,10 @@ func TestListMBPolicies(t *testing.T) {
 
 func TestGetMBPolicy(t *testing.T) {
 	t.Run("returns policy content", func(t *testing.T) {
+		data := loadTestdata(t, "mb_policy.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/mbpolicies/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "mb_policy.json"))
+			w.Write(data)
 		})
 		h := newTestHandler(t, mux)
 
@@ -415,7 +424,9 @@ func TestImportMBPolicy(t *testing.T) {
 		assert.Equal(t, "imported", result.Status)
 
 		// MB policy sent as raw string, not base64
-		assert.NotNil(t, receivedBody["mb_policy"])
+		mbPolicy, ok := receivedBody["mb_policy"].(string)
+		require.True(t, ok, "mb_policy must be a string")
+		assert.True(t, json.Valid([]byte(mbPolicy)), "mb_policy must be valid JSON")
 	})
 
 	t.Run("invalid name", func(t *testing.T) {

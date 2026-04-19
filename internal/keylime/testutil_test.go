@@ -17,6 +17,7 @@ func loadTestdata(t *testing.T, name string) []byte {
 }
 
 func newTestService(t *testing.T, handler http.Handler) *Service {
+	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 	svc, err := NewService(&Config{

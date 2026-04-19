@@ -68,6 +68,10 @@ func TestLoadConfig(t *testing.T) {
 		assert.False(t, config.TLSEnabled)
 		assert.Equal(t, "v3.0", config.APIVersion)
 		assert.Equal(t, "9090", config.Port)
+		assert.Equal(t, "localhost", config.TLSServerName)
+		assert.Equal(t, "/custom/certs/client-cert.crt", config.ClientCert)
+		assert.Equal(t, "/custom/certs/client-private.pem", config.ClientKey)
+		assert.Equal(t, "/custom/certs/cacert.crt", config.CAPath)
 	})
 
 	t.Run("cert paths derive from cert dir", func(t *testing.T) {

@@ -20,6 +20,7 @@ func loadTestdata(t *testing.T, name string) []byte {
 }
 
 func newTestHandler(t *testing.T, handler http.Handler) *ToolHandler {
+	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 	svc, err := keylime.NewService(&keylime.Config{

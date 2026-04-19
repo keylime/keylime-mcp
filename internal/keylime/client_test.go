@@ -13,6 +13,7 @@ import (
 )
 
 func newTestClient(t *testing.T, handler http.Handler) *Client {
+	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
@@ -205,7 +206,7 @@ func TestNewClient(t *testing.T) {
 			ClientKey:  "/nonexistent/key.pem",
 			CAPath:     "/nonexistent/ca.pem",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration failed")
 	})
 

@@ -13,8 +13,9 @@ import (
 
 func TestFetchAllAgentUUIDs(t *testing.T) {
 	t.Run("returns uuid list", func(t *testing.T) {
+		data := loadTestdata(t, "agent_list.json")
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_list.json"))
+			w.Write(data)
 		}))
 
 		uuids, err := svc.FetchAllAgentUUIDs(context.Background())
@@ -47,8 +48,9 @@ func TestFetchAllAgentUUIDs(t *testing.T) {
 
 func TestFetchAgentDetails(t *testing.T) {
 	t.Run("returns agent status", func(t *testing.T) {
+		data := loadTestdata(t, "agent_status.json")
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_status.json"))
+			w.Write(data)
 		}))
 
 		status, err := svc.FetchAgentDetails(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
@@ -62,8 +64,9 @@ func TestFetchAgentDetails(t *testing.T) {
 	})
 
 	t.Run("failed agent status", func(t *testing.T) {
+		data := loadTestdata(t, "agent_status_failed.json")
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "agent_status_failed.json"))
+			w.Write(data)
 		}))
 
 		status, err := svc.FetchAgentDetails(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
@@ -79,7 +82,7 @@ func TestFetchAgentDetails(t *testing.T) {
 		}))
 
 		_, err := svc.FetchAgentDetails(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "agent not found")
 	})
 
@@ -95,8 +98,9 @@ func TestFetchAgentDetails(t *testing.T) {
 
 func TestPrepareEnrollmentBody(t *testing.T) {
 	t.Run("no policies", func(t *testing.T) {
+		data := loadTestdata(t, "registrar_agent_details.json")
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(data)
 		}))
 
 		body, err := svc.PrepareEnrollmentBody(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", "", "")
@@ -111,40 +115,45 @@ func TestPrepareEnrollmentBody(t *testing.T) {
 	})
 
 	t.Run("with runtime policy", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		policyData := loadTestdata(t, "runtime_policy.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("GET /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy.json"))
+			w.Write(policyData)
 		})
 		svc := newTestService(t, mux)
 
 		body, err := svc.PrepareEnrollmentBody(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", "test-policy", "")
 		require.NoError(t, err)
 		assert.NotEmpty(t, body["runtime_policy"]) // base64 encoded
-		assert.Contains(t, body["tpm_policy"].(string), "0x400")
+		assert.Equal(t, `{"mask":"0x400"}`, body["tpm_policy"])
 	})
 
 	t.Run("with mb policy", func(t *testing.T) {
+		data := loadTestdata(t, "registrar_agent_details.json")
 		svc := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(data)
 		}))
 
 		body, err := svc.PrepareEnrollmentBody(context.Background(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", "", "mb-policy")
 		require.NoError(t, err)
 		assert.Equal(t, "mb-policy", body["mb_policy_name"])
 		// PCR mask includes PCRs 0-9, 11-15 = 0xfbff
-		assert.Contains(t, body["tpm_policy"].(string), "0xfbff")
+		assert.Equal(t, `{"mask":"0xfbff"}`, body["tpm_policy"])
 	})
 
 	t.Run("with both policies", func(t *testing.T) {
+		regData := loadTestdata(t, "registrar_agent_details.json")
+		policyData := loadTestdata(t, "runtime_policy.json")
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /v2.5/agents/{uuid}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "registrar_agent_details.json"))
+			w.Write(regData)
 		})
 		mux.HandleFunc("GET /v2.5/allowlists/{name}", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(loadTestdata(t, "runtime_policy.json"))
+			w.Write(policyData)
 		})
 		svc := newTestService(t, mux)
 
@@ -153,7 +162,7 @@ func TestPrepareEnrollmentBody(t *testing.T) {
 		assert.NotEmpty(t, body["runtime_policy"])
 		assert.Equal(t, "mb-policy", body["mb_policy_name"])
 		// combined mask: PCRs 0-10, 11-15 = 0xffff
-		assert.Contains(t, body["tpm_policy"].(string), "0xffff")
+		assert.Equal(t, `{"mask":"0xffff"}`, body["tpm_policy"])
 	})
 
 	t.Run("registrar unreachable returns error", func(t *testing.T) {
@@ -224,6 +233,7 @@ func TestExtractAPIError(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(`{"error":"something broke"}`)),
 		}
 		err := ExtractAPIError(resp)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "API request failed with HTTP 500")
 	})
 
@@ -233,7 +243,7 @@ func TestExtractAPIError(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", 20*1024))),
 		}
 		err := ExtractAPIError(resp)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Less(t, len(err.Error()), 20*1024)
 	})
 }

@@ -52,6 +52,7 @@ func TestIsFailedState(t *testing.T) {
 		{"InvalidQuote", StateInvalidQuote, true},
 		{"TenantFailed", StateTenantFailed, true},
 		{"Unknown", 99, false},
+		{"Unknown negative", -1, false},
 	}
 
 	for _, tt := range tests {
