@@ -1,0 +1,7 @@
+{
+  "code": 200,
+  "status": "Success",
+  "results": {
+    "runtimepolicy names": ["test-policy", "another-policy"]
+  }
+}
