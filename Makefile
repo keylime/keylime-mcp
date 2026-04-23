@@ -6,7 +6,7 @@ help:
 	@echo "Setup:"
 	@echo "  make install      - Full setup (check deps, env, certs, build)"
 	@echo "  make check-deps   - Verify Go is installed and certs are readable"
-	@echo "  make setup-certs  - Grant read access to Keylime certs (requires sudo)"
+	@echo "  make setup-certs  - Grant permanent read access to Keylime certs (requires sudo)"
 	@echo ""
 	@echo "Build & Run:"
 	@echo "  make build-server - Build MCP server binary"
@@ -39,14 +39,15 @@ start:
 KEYLIME_CERT_DIR := /var/lib/keylime/cv_ca
 CERT_FILES := cacert.crt client-cert.crt client-private.pem
 
+TMPFILES_CONF := /etc/tmpfiles.d/keylime-mcp.conf
+
 setup-certs:
-	@echo "Granting read access to Keylime certificates for user '$(USER)'..."
-	@sudo setfacl -m u:$(USER):rx /var/lib/keylime
-	@sudo setfacl -m u:$(USER):rx $(KEYLIME_CERT_DIR)
-	@for f in $(CERT_FILES); do \
-		sudo setfacl -m u:$(USER):r "$(KEYLIME_CERT_DIR)/$$f"; \
-	done
-	@echo "Done. Certificate access granted."
+	@printf 'a+ %s - - - - u:$(USER):%s\n' \
+		/var/lib/keylime rx \
+		$(KEYLIME_CERT_DIR) rx \
+		$(foreach f,$(CERT_FILES),$(KEYLIME_CERT_DIR)/$(f) r) \
+		| sudo tee $(TMPFILES_CONF) > /dev/null
+	@sudo systemd-tmpfiles --create $(TMPFILES_CONF)
 
 check-deps:
 	@echo "Checking dependencies..."
