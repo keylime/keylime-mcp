@@ -324,7 +324,7 @@ func (h *ToolHandler) ReactivateAgent(ctx context.Context, req *mcp.CallToolRequ
 		return nil, nil, err
 	}
 	result, err := fetchAndDecode[keylime.ReactivateAgentOutput](
-		h.service.Verifier.Put(ctx, fmt.Sprintf("agents/%s/reactivate", input.AgentUUID), nil),
+		h.service.Verifier.Put(ctx, fmt.Sprintf("agents/%s/reactivate", input.AgentUUID), struct{}{}),
 	)
 	if err != nil {
 		return nil, nil, err
@@ -341,7 +341,7 @@ func (h *ToolHandler) StopAgent(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, nil, err
 	}
 	result, err := fetchAndDecode[keylime.StopAgentOutput](
-		h.service.Verifier.Put(ctx, fmt.Sprintf("agents/%s/stop", input.AgentUUID), nil),
+		h.service.Verifier.Put(ctx, fmt.Sprintf("agents/%s/stop", input.AgentUUID), struct{}{}),
 	)
 	if err != nil {
 		return nil, nil, err
