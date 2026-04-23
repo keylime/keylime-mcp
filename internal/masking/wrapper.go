@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func WrapTool[In, Out any](engine *Engine, handler mcp.ToolHandlerFor[In, Out]) mcp.ToolHandlerFor[In, Out] {
-	if !engine.Enabled() {
+	if engine == nil || !engine.Enabled() {
 		return handler
 	}
 
@@ -35,7 +36,7 @@ func WrapTool[In, Out any](engine *Engine, handler mcp.ToolHandlerFor[In, Out]) 
 
 		outputJSON, err := json.Marshal(output)
 		if err != nil {
-			return result, output, nil
+			return nil, zero, fmt.Errorf("failed to marshal output for masking: %w", err)
 		}
 		masked := engine.Mask(string(outputJSON))
 		if masked == "null" {

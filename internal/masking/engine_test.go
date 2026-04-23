@@ -100,6 +100,17 @@ func TestMaskTPMBlobs(t *testing.T) {
 	assert.Contains(t, masked, "HOST-1")
 }
 
+func TestMaskTPMRoundtrip(t *testing.T) {
+	e := NewEngine(true)
+
+	original := `{"aik_tpm":"base64-aik-data","ek_tpm":"base64-ek-data","ekcert":"base64-cert","mtls_cert":"base64-mtls"}`
+	masked := e.Mask(original)
+	assert.NotEqual(t, original, masked)
+
+	unmasked := e.Unmask(masked)
+	assert.Equal(t, original, unmasked)
+}
+
 func TestUnmask(t *testing.T) {
 	e := NewEngine(true)
 
