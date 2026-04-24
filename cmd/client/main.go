@@ -11,6 +11,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/keylime/keylime-mcp/internal/agent"
+	"github.com/keylime/keylime-mcp/internal/masking"
 	"github.com/keylime/keylime-mcp/internal/web"
 )
 
@@ -63,7 +64,10 @@ func main() {
 		}
 	}
 
-	agentInstance := agent.NewAgent(cfg, initialProvider)
+	maskingEnabled := os.Getenv("MASKING_ENABLED") != "false"
+	masker := masking.NewEngine(maskingEnabled)
+
+	agentInstance := agent.NewAgent(cfg, initialProvider, masker)
 
 	if err := agentInstance.Connect(ctx); err != nil {
 		log.Printf("Failed to connect to MCP server: %v", err)

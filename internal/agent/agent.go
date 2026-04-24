@@ -2,12 +2,15 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
 
+	"github.com/keylime/keylime-mcp/internal/masking"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -34,6 +37,7 @@ type Config struct {
 type Agent struct {
 	config     Config
 	provider   LLMProvider
+	masker     *masking.Engine
 	mcpSession *mcp.ClientSession
 	mcpCmd     *exec.Cmd
 	tools      []*mcp.Tool
@@ -43,7 +47,7 @@ type Agent struct {
 	toolQueue []ToolRequest
 }
 
-func NewAgent(cfg Config, provider LLMProvider) *Agent {
+func NewAgent(cfg Config, provider LLMProvider, masker *masking.Engine) *Agent {
 	if cfg.MaxTokens == 0 {
 		cfg.MaxTokens = DefaultMaxTokens
 	}
@@ -57,6 +61,7 @@ func NewAgent(cfg Config, provider LLMProvider) *Agent {
 	return &Agent{
 		config:   cfg,
 		provider: provider,
+		masker:   masker,
 		messages: []Message{},
 	}
 }
@@ -67,6 +72,7 @@ func (a *Agent) Connect(ctx context.Context) error {
 		Version: mcpClientVersion,
 	}, nil)
 	cmd := exec.Command(a.config.ServerPath) // #nosec G204 -- ServerPath is from trusted config, not user input
+	cmd.Env = append(os.Environ(), "MASKING_ENABLED=false")
 	transport := &mcp.CommandTransport{Command: cmd}
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
@@ -111,6 +117,19 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 
 	messagesCopy := make([]Message, len(a.messages))
 	copy(messagesCopy, a.messages)
+
+	if a.masker != nil {
+		for i := range messagesCopy {
+			if messagesCopy[i].ToolResult != nil {
+				messagesCopy[i].ToolResult = &ToolResult{
+					ToolID:  messagesCopy[i].ToolResult.ToolID,
+					Output:  a.masker.Mask(messagesCopy[i].ToolResult.Output),
+					IsError: messagesCopy[i].ToolResult.IsError,
+				}
+			}
+		}
+	}
+
 	opts := ChatOptions{
 		Model:        a.config.Model,
 		MaxTokens:    a.config.MaxTokens,
@@ -144,19 +163,25 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 	a.mu.Unlock()
 
 	if msg.Text != "" {
-		onMessage(Message{Role: RoleAssistant, Text: msg.Text})
+		displayText := msg.Text
+		if a.masker != nil {
+			displayText = a.masker.Unmask(displayText)
+		}
+		onMessage(Message{Role: RoleAssistant, Text: displayText})
 	}
 	if firstTool != nil {
-		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*firstTool}})
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{a.unmaskToolRequest(*firstTool)}})
 	}
 
 	return nil
 }
 
 func (a *Agent) ExecuteTool(ctx context.Context, toolRequest *ToolRequest, onMessage func(Message)) error {
+	unmasked := a.unmaskToolRequest(*toolRequest)
+
 	result, err := a.mcpSession.CallTool(ctx, &mcp.CallToolParams{
-		Name:      toolRequest.Name,
-		Arguments: toolRequest.Arguments,
+		Name:      unmasked.Name,
+		Arguments: unmasked.Arguments,
 	})
 
 	var resultText string
@@ -226,11 +251,30 @@ func (a *Agent) advanceToolQueue(ctx context.Context, onMessage func(Message)) e
 	a.mu.Unlock()
 
 	if nextTool != nil {
-		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{*nextTool}})
+		onMessage(Message{Role: RoleAssistant, ToolCalls: []ToolRequest{a.unmaskToolRequest(*nextTool)}})
 		return nil
 	}
 
 	return a.callLLM(ctx, onMessage)
+}
+
+func (a *Agent) unmaskToolRequest(tr ToolRequest) ToolRequest {
+	if a.masker == nil || !a.masker.Enabled() {
+		return tr
+	}
+	argsJSON, err := json.Marshal(tr.Arguments)
+	if err != nil {
+		return tr
+	}
+	unmasked := a.masker.Unmask(string(argsJSON))
+	if unmasked == string(argsJSON) {
+		return tr
+	}
+	var realArgs any
+	if err := json.Unmarshal([]byte(unmasked), &realArgs); err != nil {
+		return tr
+	}
+	return ToolRequest{ID: tr.ID, Name: tr.Name, Arguments: realArgs}
 }
 
 func extractTextContent(content []mcp.Content) string {

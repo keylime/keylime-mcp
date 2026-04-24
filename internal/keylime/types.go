@@ -45,11 +45,12 @@ type Config struct {
 	TLSEnabled    bool
 	TLSServerName string
 
-	APIVersion string
-	ClientCert string
-	ClientKey  string // #nosec G117 -- field name for cert key path, value is not hardcoded
-	CAPath     string
-	Port       string
+	APIVersion     string
+	ClientCert     string
+	ClientKey      string // #nosec G117 -- field name for cert key path, value is not hardcoded
+	CAPath         string
+	Port           string
+	MaskingEnabled bool
 }
 
 type Client struct {
