@@ -3,7 +3,6 @@ package masking
 import (
 	"net"
 	"regexp"
-	"strings"
 )
 
 var (
@@ -11,7 +10,7 @@ var (
 	ipv4RE   = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 	ipv6RE   = regexp.MustCompile(`[0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,7}`)
 	hashRE   = regexp.MustCompile(`\b[0-9a-fA-F]{128}\b|\b[0-9a-fA-F]{96}\b|\b[0-9a-fA-F]{64}\b|\b[0-9a-fA-F]{40}\b`)
-	tpmKeyRE = regexp.MustCompile(`"(aik_tpm|ek_tpm|ekcert|mtls_cert)"\s*:\s*"[^"]*"`)
+	tpmKeyRE = regexp.MustCompile(`("(?:aik_tpm|ek_tpm|ekcert|mtls_cert)"\s*:\s*")([^"]*)"`)
 	aliasRE  = regexp.MustCompile(`\b(AGENT|HOST|HASH|TPM)-\d+\b`)
 )
 
@@ -43,13 +42,9 @@ func (e *Engine) Mask(text string) string {
 	}
 
 	text = tpmKeyRE.ReplaceAllStringFunc(text, func(match string) string {
-		if before, value, ok := strings.Cut(match, `":"`); ok {
-			value = strings.TrimSuffix(value, `"`)
-			return before + `":"` + e.tpmKeys.GetOrCreate(value) + `"`
-		}
-		if before, value, ok := strings.Cut(match, `": "`); ok {
-			value = strings.TrimSuffix(value, `"`)
-			return before + `": "` + e.tpmKeys.GetOrCreate(value) + `"`
+		parts := tpmKeyRE.FindStringSubmatch(match)
+		if len(parts) == 3 {
+			return parts[1] + e.tpmKeys.GetOrCreate(parts[2]) + `"`
 		}
 		return match
 	})
