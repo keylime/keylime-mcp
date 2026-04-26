@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"os/exec"
 	"strings"
 	"sync"
@@ -44,27 +42,9 @@ func (h *ToolHandler) GetVerifierEnrolledAgents(ctx context.Context, req *mcp.Ca
 	any,
 	error,
 ) {
-	resp, err := h.service.Verifier.Get(ctx, "agents/")
+	parsed, err := fetchAndDecode[keylime.VerifierEnrolledAgentsResponse](h.service.Verifier.Get(ctx, "agents/"))
 	if err != nil {
-		log.Printf("Error fetching enrolled agents: %v", err)
 		return nil, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, keylime.ExtractAPIError(resp)
-	}
-
-	var parsed struct {
-		Results struct {
-			UUIDs [][]string `json:"uuids"`
-		} `json:"results"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode verifier response: %w", err)
 	}
 
 	var uuids []string
@@ -277,22 +257,14 @@ func (h *ToolHandler) UpdateAgent(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, nil, err
 	}
 
-	if err := deleteAndCheck(h.service.Verifier.Delete(ctx, fmt.Sprintf("agents/%s", input.AgentUUID))); err != nil {
+	if err := checkResponse(h.service.Verifier.Delete(ctx, fmt.Sprintf("agents/%s", input.AgentUUID))); err != nil {
 		return nil, nil, fmt.Errorf("failed to unenroll agent: %w", err)
 	}
 
-	resp, err := h.service.Verifier.Post(ctx, fmt.Sprintf("agents/%s", input.AgentUUID), body)
-	if err != nil {
+	if _, err := fetchAndDecode[keylime.EnrollAgentToVerifierOutput](
+		h.service.Verifier.Post(ctx, fmt.Sprintf("agents/%s", input.AgentUUID), body),
+	); err != nil {
 		return nil, nil, fmt.Errorf("CRITICAL: agent was unenrolled but re-enrollment failed: %w — manually re-enroll agent %s", err, input.AgentUUID)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	var enrollResp keylime.EnrollAgentToVerifierOutput
-	if err := json.NewDecoder(resp.Body).Decode(&enrollResp); err != nil {
-		return nil, nil, fmt.Errorf("CRITICAL: agent was unenrolled but response decode failed: %w — verify agent %s status", err, input.AgentUUID)
 	}
 
 	return nil, keylime.UpdateAgentOutput{AgentUUID: input.AgentUUID, Status: "updated"}, nil
@@ -396,19 +368,8 @@ func (h *ToolHandler) ImportRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		"runtime_policy": base64.StdEncoding.EncodeToString(data),
 	}
 
-	endpoint := fmt.Sprintf("allowlists/%s", input.Name)
-	resp, err := h.service.Verifier.Post(ctx, endpoint, body)
-	if err != nil {
-		log.Printf("Error importing runtime policy: %v", err)
+	if err := checkResponse(h.service.Verifier.Post(ctx, fmt.Sprintf("allowlists/%s", input.Name), body)); err != nil {
 		return nil, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, keylime.ExtractAPIError(resp)
 	}
 
 	return nil, keylime.ImportRuntimePolicyOutput{Name: input.Name, Status: "imported"}, nil
@@ -427,23 +388,11 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		return nil, nil, fmt.Errorf("at least one of add_excludes, add_digests, remove_excludes or remove_digests is required")
 	}
 
-	// Fetch existing policy
-	getResp, err := h.service.Verifier.Get(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName))
+	policyData, err := fetchAndDecode[keylime.GetRuntimePolicyOutput](
+		h.service.Verifier.Get(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName)),
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch policy %q: %w", input.PolicyName, err)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, getResp.Body)
-		_ = getResp.Body.Close()
-	}()
-
-	if getResp.StatusCode < 200 || getResp.StatusCode >= 300 {
-		return nil, nil, keylime.ExtractAPIError(getResp)
-	}
-
-	var policyData keylime.GetRuntimePolicyOutput
-	if err := json.NewDecoder(getResp.Body).Decode(&policyData); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode policy %q: %w", input.PolicyName, err)
 	}
 	var policy map[string]any
 	policyStr := policyData.Results.RuntimePolicy
@@ -530,17 +479,8 @@ func (h *ToolHandler) UpdateRuntimePolicy(ctx context.Context, req *mcp.CallTool
 		"runtime_policy": base64.StdEncoding.EncodeToString(policyJSON),
 	}
 
-	reuploadResp, err := h.service.Verifier.Put(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName), body)
-	if err != nil {
+	if err := checkResponse(h.service.Verifier.Put(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName), body)); err != nil {
 		return nil, nil, fmt.Errorf("failed to update policy: %w", err)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, reuploadResp.Body)
-		_ = reuploadResp.Body.Close()
-	}()
-
-	if reuploadResp.StatusCode < 200 || reuploadResp.StatusCode >= 300 {
-		return nil, nil, keylime.ExtractAPIError(reuploadResp)
 	}
 
 	return nil, keylime.UpdateRuntimePolicyOutput{PolicyName: input.PolicyName, Status: "updated"}, nil
@@ -554,7 +494,7 @@ func (h *ToolHandler) DeleteRuntimePolicy(ctx context.Context, req *mcp.CallTool
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-	if err := deleteAndCheck(h.service.Verifier.Delete(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName))); err != nil {
+	if err := checkResponse(h.service.Verifier.Delete(ctx, fmt.Sprintf("allowlists/%s", input.PolicyName))); err != nil {
 		return nil, nil, err
 	}
 	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil
@@ -607,19 +547,8 @@ func (h *ToolHandler) ImportMBPolicy(ctx context.Context, req *mcp.CallToolReque
 		"mb_policy": string(data),
 	}
 
-	endpoint := fmt.Sprintf("mbpolicies/%s", input.Name)
-	resp, err := h.service.Verifier.Post(ctx, endpoint, body)
-	if err != nil {
-		log.Printf("Error importing measured boot policy: %v", err)
+	if err := checkResponse(h.service.Verifier.Post(ctx, fmt.Sprintf("mbpolicies/%s", input.Name), body)); err != nil {
 		return nil, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, keylime.ExtractAPIError(resp)
 	}
 
 	return nil, keylime.ImportMBPolicyOutput{Name: input.Name, Status: "imported"}, nil
@@ -633,7 +562,7 @@ func (h *ToolHandler) DeleteMBPolicy(ctx context.Context, req *mcp.CallToolReque
 	if err := validatePolicyName(input.PolicyName); err != nil {
 		return nil, nil, err
 	}
-	if err := deleteAndCheck(h.service.Verifier.Delete(ctx, fmt.Sprintf("mbpolicies/%s", input.PolicyName))); err != nil {
+	if err := checkResponse(h.service.Verifier.Delete(ctx, fmt.Sprintf("mbpolicies/%s", input.PolicyName))); err != nil {
 		return nil, nil, err
 	}
 	return nil, keylime.DeletePolicyOutput{PolicyName: input.PolicyName, Status: "deleted"}, nil

@@ -35,8 +35,8 @@ func fetchAndDecode[T any](resp *http.Response, err error) (T, error) {
 	return result, nil
 }
 
-// deleteAndCheck verifies a DELETE request returned a success code.
-func deleteAndCheck(resp *http.Response, err error) error {
+// checkResponse verifies an HTTP request succeeded and discards the body.
+func checkResponse(resp *http.Response, err error) error {
 	if err != nil {
 		return err
 	}
