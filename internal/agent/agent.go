@@ -18,7 +18,7 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	DefaultMaxTokens = 2048
+	DefaultMaxTokens    = 2048
 	DefaultSystemPrompt = `You are a Keylime infrastructure assistant with access to tools. You help users manage and monitor Keylime agents.
 
 When users request information or actions, call the appropriate tool directly. You can call tools in sequence to complete multi-step tasks. After receiving tool results, summarize them for the user. If a tool returns an error, explain the issue and suggest a resolution.`
