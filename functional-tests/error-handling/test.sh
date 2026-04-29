@@ -27,7 +27,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Enroll non-existent agent returns error"
-        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${FAKE_UUID}\"}" 12
+        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${FAKE_UUID}\",\"runtime_policy_name\":\"\",\"mb_policy_name\":\"\"}" 12
         mcpAssertError
     rlPhaseEnd
 
@@ -47,17 +47,17 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Get_verifier_logs with attestation_failures filter"
-        mcpCallTool "Get_verifier_logs" '{"filter":"attestation_failures","lines":10}' 16
+        mcpCallTool "Get_verifier_logs" '{"filter":"attestation_failures","lines":10,"agent_uuid":""}' 16
         mcpAssertSuccess
     rlPhaseEnd
 
     rlPhaseStartTest "Get_verifier_logs with errors filter"
-        mcpCallTool "Get_verifier_logs" '{"filter":"errors","lines":10}' 17
+        mcpCallTool "Get_verifier_logs" '{"filter":"errors","lines":10,"agent_uuid":""}' 17
         mcpAssertSuccess
     rlPhaseEnd
 
     rlPhaseStartTest "Get_verifier_logs with all filter"
-        mcpCallTool "Get_verifier_logs" '{"filter":"all","lines":10}' 18
+        mcpCallTool "Get_verifier_logs" '{"filter":"all","lines":10,"agent_uuid":""}' 18
         mcpAssertSuccess
     rlPhaseEnd
 

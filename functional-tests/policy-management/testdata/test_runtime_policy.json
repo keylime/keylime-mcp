@@ -5,9 +5,11 @@
     "timestamp": "2025-01-01T00:00:00Z"
   },
   "release": 0,
-  "digests": {
-    "/bin/bash": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"]
+  "ima": {
+    "ignored_keyrings": [],
+    "log_hash_alg": "sha256",
+    "dm_policy": null
   },
-  "excludes": ["/tmp(/.*)?"],
-  "keyrings": {}
+  "ima-buf": {},
+  "verification-keys": ""
 }

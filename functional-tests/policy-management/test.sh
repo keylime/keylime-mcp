@@ -47,7 +47,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Update_runtime_policy add exclude"
-        mcpCallTool "Update_runtime_policy" "{\"policy_name\":\"${POLICY_NAME}\",\"add_excludes\":[\"/var/log/test\"]}" 14
+        mcpCallTool "Update_runtime_policy" "{\"policy_name\":\"${POLICY_NAME}\",\"add_excludes\":[\"/var/log/test\"],\"remove_excludes\":[],\"add_digests\":{},\"remove_digests\":[]}" 14
         mcpAssertSuccess
         mcpAssertResultContains 'updated'
     rlPhaseEnd

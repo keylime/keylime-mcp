@@ -35,7 +35,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Enroll_agent_to_verifier"
-        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${AGENT_ID}\"}" 13
+        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${AGENT_ID}\",\"runtime_policy_name\":\"\",\"mb_policy_name\":\"\"}" 13
         MCP_WAIT=5
         mcpAssertSuccess
         MCP_WAIT=3
@@ -78,7 +78,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Update_agent re-enrolls with same config"
-        mcpCallTool "Update_agent" "{\"agent_uuid\":\"${AGENT_ID}\"}" 20
+        mcpCallTool "Update_agent" "{\"agent_uuid\":\"${AGENT_ID}\",\"runtime_policy_name\":\"\",\"mb_policy_name\":\"\"}" 20
         MCP_WAIT=5
         mcpAssertSuccess
         mcpAssertResultContains 'updated'
