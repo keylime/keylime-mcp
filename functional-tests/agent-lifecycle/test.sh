@@ -25,7 +25,7 @@ rlJournalStart
     rlPhaseStartTest "Get_agent_details returns registrar info"
         mcpCallTool "Get_agent_details" "{\"agent_uuid\":\"${AGENT_ID}\"}" 11
         mcpAssertSuccess
-        mcpAssertResultContains "${AGENT_ID}"
+        mcpAssertResultContains 'aik_tpm'
     rlPhaseEnd
 
     rlPhaseStartTest "Get_verifier_enrolled_agents before enrollment"

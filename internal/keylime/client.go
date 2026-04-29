@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -81,17 +82,21 @@ func (kc *Client) Get(ctx context.Context, endpoint string) (*http.Response, err
 
 func (kc *Client) doRequestWithBody(ctx context.Context, method, endpoint string, body any) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s/%s", kc.baseURL, kc.APIVersion, strings.TrimPrefix(endpoint, "/"))
-	var buf bytes.Buffer
+	var reqBody io.Reader
 	if body != nil {
+		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(body); err != nil {
 			return nil, fmt.Errorf("failed to marshal body: %w", err)
 		}
+		reqBody = &buf
 	}
-	req, err := http.NewRequestWithContext(ctx, method, url, &buf)
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return kc.httpClient.Do(req) // #nosec G704 -- URL is built from trusted config, not user input
 }
 
