@@ -42,7 +42,8 @@ rlJournalStart
 
     rlPhaseStartTest "Get_agent_details"
         mcpCallTool "Get_agent_details" "{\"agent_uuid\":\"${AGENT_ID}\"}" 5
-        mcpAssertResultContains "${AGENT_ID}"
+        mcpAssertSuccess
+        mcpAssertResultContains 'aik_tpm'
     rlPhaseEnd
 
     rlPhaseStartTest "Enroll_agent_to_verifier"
