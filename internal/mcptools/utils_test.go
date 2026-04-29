@@ -344,17 +344,17 @@ func TestFetchAndDecode(t *testing.T) {
 	})
 }
 
-func TestDeleteAndCheck(t *testing.T) {
+func TestCheckResponse(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: 200,
 			Body:       io.NopCloser(strings.NewReader("")),
 		}
-		assert.NoError(t, deleteAndCheck(resp, nil))
+		assert.NoError(t, checkResponse(resp, nil))
 	})
 
 	t.Run("http error", func(t *testing.T) {
-		err := deleteAndCheck(nil, fmt.Errorf("connection refused"))
+		err := checkResponse(nil, fmt.Errorf("connection refused"))
 		assert.ErrorContains(t, err, "connection refused")
 	})
 
@@ -363,7 +363,7 @@ func TestDeleteAndCheck(t *testing.T) {
 			StatusCode: 404,
 			Body:       io.NopCloser(strings.NewReader(`{"status":"not found"}`)),
 		}
-		err := deleteAndCheck(resp, nil)
+		err := checkResponse(resp, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "404")
 	})

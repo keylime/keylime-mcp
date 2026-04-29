@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -15,12 +16,14 @@ import (
 	"github.com/keylime/keylime-mcp/internal/web"
 )
 
-const (
-	defaultServerPath = "./server"
-	defaultPort       = "3000"
-	defaultOllamaURL  = "http://localhost:11434"
-	envFileLocation   = "./../.env"
-)
+type config struct {
+	ServerPath     string
+	Port           string
+	OllamaURL      string
+	OllamaModel    string
+	AnthropicKey   string
+	MaskingEnabled bool
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -34,40 +37,26 @@ func main() {
 		cancel()
 	}()
 
-	if err := godotenv.Load(envFileLocation); err != nil {
-		log.Printf("Warning: .env file not loaded: %v", err)
-	}
+	cfg := loadConfig()
 
-	serverPath := os.Getenv("MCP_SERVER_PATH")
-	if serverPath == "" {
-		serverPath = defaultServerPath
-	}
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
-	}
-
-	if _, err := os.Stat(serverPath); os.IsNotExist(err) { // #nosec G703 -- serverPath from env/default, not user input
-		log.Printf("Warning: MCP server not found at %s", serverPath)
+	if _, err := os.Stat(cfg.ServerPath); os.IsNotExist(err) { // #nosec G703 -- serverPath from env/default, not user input
+		log.Printf("Warning: MCP server not found at %s", cfg.ServerPath)
 		log.Printf("Build the server first: go build -o bin/server cmd/server/main.go")
 		return
 	}
 
-	providers, initialProvider, initialModel := createProviders()
+	providers, initialProvider, initialModel := createProviders(cfg)
 
-	cfg := agent.Config{ServerPath: serverPath, Model: initialModel}
-	if cfg.Model == "" {
+	agentCfg := agent.Config{ServerPath: cfg.ServerPath, Model: initialModel}
+	if agentCfg.Model == "" {
 		if models, err := initialProvider.ListModels(ctx); err == nil && len(models) > 0 {
-			cfg.Model = models[0].ID
-			log.Printf("Auto-selected model: %s", cfg.Model)
+			agentCfg.Model = models[0].ID
+			log.Printf("Auto-selected model: %s", agentCfg.Model)
 		}
 	}
 
-	maskingEnabled := os.Getenv("MASKING_ENABLED") != "false"
-	masker := masking.NewEngine(maskingEnabled)
-
-	agentInstance := agent.NewAgent(cfg, initialProvider, masker)
+	masker := masking.NewEngine(cfg.MaskingEnabled)
+	agentInstance := agent.NewAgent(agentCfg, initialProvider, masker)
 
 	if err := agentInstance.Connect(ctx); err != nil {
 		log.Printf("Failed to connect to MCP server: %v", err)
@@ -87,7 +76,7 @@ func main() {
 		return
 	}
 
-	addr := fmt.Sprintf(":%s", port)
+	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Starting Keylime MCP Agent at http://localhost%s", addr)
 
 	if err := srv.Start(addr); err != nil {
@@ -96,29 +85,47 @@ func main() {
 	}
 }
 
-func createProviders() ([]agent.LLMProvider, agent.LLMProvider, string) {
-	ollamaURL := os.Getenv("OLLAMA_URL")
-	ollamaModel := os.Getenv("OLLAMA_MODEL")
-	apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
-
-	if ollamaURL == "" {
-		ollamaURL = defaultOllamaURL
+func loadConfig() config {
+	if err := godotenv.Load("./../.env"); err != nil {
+		log.Printf("Warning: .env file not loaded: %v", err)
 	}
+	return config{
+		ServerPath:     getEnv("MCP_SERVER_PATH", "./server"),
+		Port:           getEnv("PORT", "3000"),
+		OllamaURL:      getEnv("OLLAMA_URL", "http://localhost:11434"),
+		OllamaModel:    os.Getenv("OLLAMA_MODEL"),
+		AnthropicKey:   strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")),
+		MaskingEnabled: parseBool(getEnv("MASKING_ENABLED", "true")),
+	}
+}
 
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func parseBool(s string) bool {
+	v, _ := strconv.ParseBool(s)
+	return v
+}
+
+func createProviders(cfg config) ([]agent.LLMProvider, agent.LLMProvider, string) {
 	var providers []agent.LLMProvider
 
 	var claudeProvider *agent.AnthropicProvider
-	if apiKey != "" {
-		claudeProvider = agent.NewClaudeProvider(apiKey)
+	if cfg.AnthropicKey != "" {
+		claudeProvider = agent.NewClaudeProvider(cfg.AnthropicKey)
 		providers = append(providers, claudeProvider)
 	}
 
-	ollamaProvider := agent.NewOllamaProvider(ollamaURL)
+	ollamaProvider := agent.NewOllamaProvider(cfg.OllamaURL)
 	providers = append(providers, ollamaProvider)
 
-	if ollamaModel != "" || os.Getenv("OLLAMA_URL") != "" {
-		log.Printf("Using Ollama provider at %s", ollamaURL)
-		return providers, ollamaProvider, ollamaModel
+	if cfg.OllamaModel != "" || os.Getenv("OLLAMA_URL") != "" {
+		log.Printf("Using Ollama provider at %s", cfg.OllamaURL)
+		return providers, ollamaProvider, cfg.OllamaModel
 	}
 
 	if claudeProvider == nil {

@@ -18,9 +18,7 @@ const (
 	mcpClientName    = "mcp-client"
 	mcpClientVersion = "v1.0.0"
 
-	DefaultMaxTokens = 2048
-	DefaultMaxTurns  = 5
-
+	DefaultMaxTokens    = 2048
 	DefaultSystemPrompt = `You are a Keylime infrastructure assistant with access to tools. You help users manage and monitor Keylime agents.
 
 When users request information or actions, call the appropriate tool directly. You can call tools in sequence to complete multi-step tasks. After receiving tool results, summarize them for the user. If a tool returns an error, explain the issue and suggest a resolution.`
@@ -30,7 +28,6 @@ type Config struct {
 	ServerPath   string
 	Model        string
 	MaxTokens    int64
-	MaxTurns     int
 	SystemPrompt string
 }
 
@@ -50,9 +47,6 @@ type Agent struct {
 func NewAgent(cfg Config, provider LLMProvider, masker *masking.Engine) *Agent {
 	if cfg.MaxTokens == 0 {
 		cfg.MaxTokens = DefaultMaxTokens
-	}
-	if cfg.MaxTurns == 0 {
-		cfg.MaxTurns = DefaultMaxTurns
 	}
 	if cfg.SystemPrompt == "" {
 		cfg.SystemPrompt = DefaultSystemPrompt

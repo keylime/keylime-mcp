@@ -23,7 +23,7 @@ func (b *anthropicBase) Chat(ctx context.Context, opts ChatOptions) (*LLMRespons
 	response, err := b.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(opts.Model),
 		MaxTokens: opts.MaxTokens,
-		System:    []anthropic.TextBlockParam{{Type: "text", Text: opts.SystemPrompt}},
+		System:    []anthropic.TextBlockParam{{Type: "text", Text: opts.SystemPrompt, CacheControl: anthropic.NewCacheControlEphemeralParam()}},
 		Messages:  messages,
 		Tools:     tools,
 	})
@@ -112,6 +112,9 @@ func convertToolsToAnthropic(tools []*mcp.Tool) []anthropic.ToolUnionParam {
 	result := make([]anthropic.ToolUnionParam, 0, len(tools))
 	for _, tool := range tools {
 		result = append(result, convertMCPToolToAnthropic(tool))
+	}
+	if len(result) > 0 {
+		result[len(result)-1].OfTool.CacheControl = anthropic.NewCacheControlEphemeralParam()
 	}
 	return result
 }

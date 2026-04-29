@@ -257,6 +257,14 @@ type GetVerifierEnrolledAgentsOutput struct {
 	Agents []string `json:"agents"`
 }
 
+type VerifierEnrolledAgentsResponse struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Results struct {
+		UUIDs [][]string `json:"uuids"`
+	} `json:"results"`
+}
+
 type ListRuntimePoliciesInput struct{}
 
 type ListRuntimePoliciesOutput struct {
