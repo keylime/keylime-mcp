@@ -25,29 +25,24 @@ mcpStartServer() {
 }
 
 mcpStartServerExpectFail() {
-    local fifo
-    fifo=$(mktemp -u)
     MCP_OUTPUT=$(mktemp)
     MCP_ERR=$(mktemp)
-    mkfifo "${fifo}"
 
     local env_prefix=""
     for pair in "$@"; do
         env_prefix="${env_prefix} ${pair}"
     done
 
-    eval "${env_prefix} ${MCP_BIN} < ${fifo} > ${MCP_OUTPUT} 2>${MCP_ERR} &"
+    eval "${env_prefix} ${MCP_BIN} < /dev/null > ${MCP_OUTPUT} 2>${MCP_ERR} &"
     local pid=$!
     sleep 2
 
     if ! kill -0 "${pid}" 2>/dev/null; then
         wait "${pid}" 2>/dev/null
-        rm -f "${fifo}"
         return 0
     else
         kill "${pid}" 2>/dev/null
         wait "${pid}" 2>/dev/null
-        rm -f "${fifo}"
         return 1
     fi
 }
@@ -87,27 +82,47 @@ mcpCallTool() {
     local id="$3"
     local wait="${MCP_WAIT:-3}"
 
+    MCP_LAST_RESPONSE=$(mktemp)
+    local before_lines
+    before_lines=$(wc -l < "${MCP_OUTPUT}")
+
     echo "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"${tool_name}\",\"arguments\":${arguments}},\"id\":${id}}" >&3
     sleep "${wait}"
+
+    tail -n +$(( before_lines + 1 )) "${MCP_OUTPUT}" > "${MCP_LAST_RESPONSE}"
 }
 
 mcpSendRaw() {
+    MCP_LAST_RESPONSE=$(mktemp)
+    local before_lines
+    before_lines=$(wc -l < "${MCP_OUTPUT}")
+
     echo "$1" >&3
     sleep "${MCP_WAIT:-2}"
+
+    tail -n +$(( before_lines + 1 )) "${MCP_OUTPUT}" > "${MCP_LAST_RESPONSE}"
 }
 
 mcpAssertSuccess() {
-    rlAssertNotGrep '"isError":true' "${MCP_OUTPUT}"
+    rlAssertNotGrep '"isError":true' "${MCP_LAST_RESPONSE}"
+    rlAssertNotGrep '"error":{' "${MCP_LAST_RESPONSE}"
 }
 
 mcpAssertError() {
-    rlAssertGrep '"isError":true' "${MCP_OUTPUT}"
+    local found_tool_error found_rpc_error
+    grep -q '"isError":true' "${MCP_LAST_RESPONSE}" && found_tool_error=1
+    grep -q '"error":{' "${MCP_LAST_RESPONSE}" && found_rpc_error=1
+    if [ -n "${found_tool_error}" ] || [ -n "${found_rpc_error}" ]; then
+        rlPass "Response contains error as expected"
+    else
+        rlFail "Response does not contain expected error"
+    fi
 }
 
 mcpAssertResultContains() {
-    rlAssertGrep "$1" "${MCP_OUTPUT}"
+    rlAssertGrep "$1" "${MCP_LAST_RESPONSE}"
 }
 
 mcpAssertResultNotContains() {
-    rlAssertNotGrep "$1" "${MCP_OUTPUT}"
+    rlAssertNotGrep "$1" "${MCP_LAST_RESPONSE}"
 }

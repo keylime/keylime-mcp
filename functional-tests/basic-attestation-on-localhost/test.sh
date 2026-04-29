@@ -46,7 +46,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Enroll_agent_to_verifier"
-        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${AGENT_ID}\"}" 6
+        mcpCallTool "Enroll_agent_to_verifier" "{\"agent_uuid\":\"${AGENT_ID}\",\"runtime_policy_name\":\"\",\"mb_policy_name\":\"\"}" 6
         MCP_WAIT=5
         mcpAssertSuccess
         MCP_WAIT=3
