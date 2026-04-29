@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -94,7 +95,7 @@ func loadConfig() config {
 		OllamaURL:      getEnv("OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:    os.Getenv("OLLAMA_MODEL"),
 		AnthropicKey:   strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")),
-		MaskingEnabled: getEnv("MASKING_ENABLED", "true") == "true",
+		MaskingEnabled: parseBool(getEnv("MASKING_ENABLED", "true")),
 	}
 }
 
@@ -103,6 +104,11 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func parseBool(s string) bool {
+	v, _ := strconv.ParseBool(s)
+	return v
 }
 
 func createProviders(cfg config) ([]agent.LLMProvider, agent.LLMProvider, string) {

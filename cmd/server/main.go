@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/keylime/keylime-mcp/internal/keylime"
@@ -62,14 +63,14 @@ func loadConfig() keylime.Config {
 		VerifierURL:    getEnv("KEYLIME_VERIFIER_URL", "https://localhost:8881"),
 		RegistrarURL:   getEnv("KEYLIME_REGISTRAR_URL", "https://localhost:8891"),
 		CertDir:        certDir,
-		TLSEnabled:     getEnv("KEYLIME_TLS_ENABLED", "true") == "true",
+		TLSEnabled:     parseBool(getEnv("KEYLIME_TLS_ENABLED", "true")),
 		TLSServerName:  getEnv("KEYLIME_TLS_SERVER_NAME", "localhost"),
 		APIVersion:     getEnv("KEYLIME_API_VERSION", "v2.5"),
 		ClientCert:     getEnv("KEYLIME_CLIENT_CERT", certDir+"/client-cert.crt"),
 		ClientKey:      getEnv("KEYLIME_CLIENT_KEY", certDir+"/client-private.pem"),
 		CAPath:         getEnv("KEYLIME_CA_CERT", certDir+"/cacert.crt"),
 		Port:           getEnv("PORT", "8080"),
-		MaskingEnabled: getEnv("MASKING_ENABLED", "true") == "true",
+		MaskingEnabled: parseBool(getEnv("MASKING_ENABLED", "true")),
 	}
 }
 
@@ -78,4 +79,9 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func parseBool(s string) bool {
+	v, _ := strconv.ParseBool(s)
+	return v
 }
