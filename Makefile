@@ -78,7 +78,4 @@ test-race:
 	go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -race -count=1
 
 test-functional:
-	testing-farm request
-		--compose Fedora-Rawhide
-		--plan 'functional-tests/plans/keylime-mcp-basic'
-		--arch x86_64,aarch64,ppc64le,s390x
+	go test -v -count=1 -timeout=600s -tags=functional ./functional-tests/...

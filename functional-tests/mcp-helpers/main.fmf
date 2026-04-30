@@ -1,9 +1,0 @@
-summary: MCP server test helper functions
-description: |
-    Shared BeakerLib library providing helper functions for
-    MCP JSON-RPC communication in functional tests.
-    Handles server build, start/stop, protocol initialization,
-    tool invocation, and response assertions.
-contact: Marek Safarik <msafarik@redhat.com>
-component:
-  - keylime-mcp
