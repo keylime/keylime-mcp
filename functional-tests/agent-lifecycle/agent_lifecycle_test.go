@@ -101,6 +101,7 @@ func TestAgentLifecycle(t *testing.T) {
 	})
 
 	t.Run("Get_verifier_enrolled_agents_after_unenroll", func(t *testing.T) {
+		time.Sleep(2 * time.Second)
 		result := s.CallTool("Get_verifier_enrolled_agents", map[string]any{})
 		require.False(t, result.IsError)
 		assert.NotContains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
