@@ -1,22 +1,15 @@
-summary: Test runtime and measured boot policy CRUD via MCP tools
+summary: Runtime and measured boot policy management via MCP server
 description: |
-    Tests Import, List, Get, Update, and Delete operations
-    for both runtime and measured boot policies through
-    the MCP server tool interface.
+    Tests policy CRUD operations through MCP tools:
+    import, list, get, update, and delete for both
+    runtime policies and measured boot policies.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
-test: ./test.sh
-framework: beakerlib
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/policy-management/
 require:
-  - type: library
-    url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
-    name: /Library/test-helpers
   - golang
-  - jq
-recommend:
   - keylime
-  - python3-tomli
-duration: 10m
+duration: 5m
 enabled: true

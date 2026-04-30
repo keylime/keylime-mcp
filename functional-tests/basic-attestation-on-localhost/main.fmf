@@ -1,24 +1,15 @@
-summary: Tests keylime-mcp server functionality against a running keylime instance
+summary: Basic attestation scenario via MCP server
 description: |
-    Starts keylime services on localhost with emulated TPM.
-    Builds the keylime-mcp MCP server from source.
-    Tests MCP protocol: initialization, tool listing,
-    version/health check, agent listing, agent enrollment,
-    agent status retrieval, and policy operations.
+    Tests MCP protocol initialization, tool listing,
+    health check, agent enrollment, status and unenrollment
+    against a running keylime instance.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
-test: ./test.sh
-framework: beakerlib
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/basic-attestation-on-localhost/
 require:
-  - type: library
-    url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
-    name: /Library/test-helpers
   - golang
-  - jq
-recommend:
   - keylime
-  - python3-tomli
-duration: 15m
+duration: 5m
 enabled: true

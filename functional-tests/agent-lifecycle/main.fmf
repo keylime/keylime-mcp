@@ -1,25 +1,15 @@
-summary: Test full agent lifecycle through MCP tools
+summary: Full agent lifecycle via MCP server
 description: |
-    Tests agent discovery, enrollment, status checks, policy queries,
-    stop, reactivate, update, unenroll, and registrar removal.
-    Covers Get_all_agents, Get_agent_details, Get_verifier_enrolled_agents,
-    Enroll_agent_to_verifier, Get_agent_status, Get_agent_policies,
-    Get_failed_agents, Stop_agent, Reactivate_agent, Update_agent,
-    Unenroll_agent_from_verifier, and Registrar_remove_agent.
+    Tests complete agent lifecycle through MCP tools:
+    registration, enrollment, status, policies, stop,
+    reactivate, update, unenroll, and registrar removal.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
-test: ./test.sh
-framework: beakerlib
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/agent-lifecycle/
 require:
-  - type: library
-    url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
-    name: /Library/test-helpers
   - golang
-  - jq
-recommend:
   - keylime
-  - python3-tomli
-duration: 15m
+duration: 5m
 enabled: true

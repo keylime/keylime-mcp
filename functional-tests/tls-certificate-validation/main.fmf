@@ -1,23 +1,16 @@
-summary: Verify MCP server TLS/mTLS certificate handling
+summary: TLS certificate validation for MCP server
 description: |
-    Tests that the MCP server correctly uses mTLS when communicating
-    with Keylime services. Validates positive (valid certs) and negative
-    (wrong CA, missing cert, SNI mismatch, TLS disabled) scenarios.
+    Tests TLS behavior: valid mTLS, wrong CA certificate,
+    missing client certificate, SNI hostname mismatch,
+    and TLS disabled mode.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
-test: ./test.sh
-framework: beakerlib
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/tls-certificate-validation/
 require:
-  - type: library
-    url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
-    name: /Library/test-helpers
   - golang
-  - jq
-  - openssl
-recommend:
   - keylime
-  - python3-tomli
-duration: 10m
+  - openssl
+duration: 5m
 enabled: true

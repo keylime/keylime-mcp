@@ -1,22 +1,14 @@
-summary: Test MCP server error handling with invalid inputs and failures
+summary: Error handling and edge cases for MCP server
 description: |
-    Tests graceful error responses for bad UUIDs, non-existent agents,
-    non-existent policies, verifier log filters, and partial service
-    outages (verifier down while registrar is up).
+    Tests error responses for invalid inputs, non-existent
+    resources, verifier log queries, and partial service failures.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
-test: ./test.sh
-framework: beakerlib
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/error-handling/
 require:
-  - type: library
-    url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
-    name: /Library/test-helpers
   - golang
-  - jq
-recommend:
   - keylime
-  - python3-tomli
-duration: 10m
+duration: 5m
 enabled: true
