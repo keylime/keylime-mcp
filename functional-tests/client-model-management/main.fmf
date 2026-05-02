@@ -1,0 +1,15 @@
+summary: Client model management - list, get, set, invalid provider
+description: |
+    Tests the web client model management endpoints including
+    model listing, current model retrieval, model switching,
+    and invalid provider rejection.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/client-model-management/
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true
