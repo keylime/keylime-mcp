@@ -17,8 +17,6 @@ import (
 	"github.com/keylime/keylime-mcp/internal/agent"
 )
 
-const eventError = "error"
-
 //go:embed templates/*
 var templatesFS embed.FS
 
@@ -127,7 +125,7 @@ func (s *Server) processMessage(message string) {
 	if err != nil {
 		log.Printf("[ERROR] Agent error: %v", err)
 		s.send(SSEvent{
-			Event: eventError,
+			Event: "error",
 			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}
@@ -190,7 +188,7 @@ func (s *Server) handleToolDeny(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[ERROR] Tool deny response error: %v", err)
 		s.send(SSEvent{
-			Event: eventError,
+			Event: "error",
 			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}
@@ -211,7 +209,7 @@ func (s *Server) executeTool(tool *agent.ToolRequest) {
 	if err != nil {
 		log.Printf("[ERROR] Tool execution error: %v", err)
 		s.send(SSEvent{
-			Event: eventError,
+			Event: "error",
 			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}

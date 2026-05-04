@@ -58,10 +58,10 @@ func TestValidatePolicyName(t *testing.T) {
 		{testEmpty, "", "policy_name is required"},
 		{"too long", strings.Repeat("a", 256), "policy_name exceeds 255 characters"},
 		{"max length OK", strings.Repeat("a", 255), ""},
-		{"path traversal", pathTraversal, "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
-		{"semicolon", "name;rm", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
-		{"spaces", "my policy", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
-		{"slash", "path/name", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
+		{"path traversal", pathTraversal, errInvalidPolicyChars},
+		{"semicolon", "name;rm", errInvalidPolicyChars},
+		{"spaces", "my policy", errInvalidPolicyChars},
+		{"slash", "path/name", errInvalidPolicyChars},
 	}
 
 	for _, tt := range tests {

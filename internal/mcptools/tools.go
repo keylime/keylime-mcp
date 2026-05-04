@@ -573,16 +573,15 @@ func (h *ToolHandler) InvestigateVerifierLogs(ctx context.Context, req *mcp.Call
 	any,
 	error,
 ) {
-	const filterAll = "all"
 	var logFilters = map[string][]string{
 		"attestation_failures": {"FAIL", "fail", "not_in_allowlist", "invalid", "mismatch", "pcr", "quote", "policy", "not reachable", "terminated", "Revocation"},
 		"errors":               {"ERROR", "Traceback", "Exception", "CRITICAL", "Unable"},
 	}
 	filter := input.Filter
 	if filter == "" {
-		filter = filterAll
+		filter = "all"
 	}
-	if filter != filterAll {
+	if filter != "all" {
 		if _, ok := logFilters[filter]; !ok {
 			return nil, nil, fmt.Errorf("invalid filter %q: must be 'all', 'attestation_failures', or 'errors'", filter)
 		}

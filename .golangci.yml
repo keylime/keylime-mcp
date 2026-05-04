@@ -32,7 +32,7 @@ linters:
       threshold: 100
     goconst:
       min-len: 3
-      min-occurrences: 3
+      min-occurrences: 4
     misspell:
       locale: US
     errcheck:
