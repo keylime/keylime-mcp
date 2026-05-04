@@ -28,7 +28,7 @@ func TestListRuntimePolicies(t *testing.T) {
 		require.NoError(t, err)
 
 		result := output.(keylime.ListRuntimePoliciesOutput)
-		assert.Equal(t, []string{"test-policy", "another-policy"}, result.Results.RuntimePolicyNames)
+		assert.Equal(t, []string{testPolicyName, "another-policy"}, result.Results.RuntimePolicyNames)
 	})
 }
 
@@ -42,19 +42,19 @@ func TestGetRuntimePolicy(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.GetRuntimePolicy(context.Background(), nil, keylime.GetRuntimePolicyInput{
-			PolicyName: "test-policy",
+			PolicyName: testPolicyName,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.GetRuntimePolicyOutput)
-		assert.Equal(t, "test-policy", result.Results.Name)
+		assert.Equal(t, testPolicyName, result.Results.Name)
 		assert.NotEmpty(t, result.Results.RuntimePolicy)
 	})
 
 	t.Run("invalid name rejected", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.GetRuntimePolicy(context.Background(), nil, keylime.GetRuntimePolicyInput{
-			PolicyName: "../evil",
+			PolicyName: pathTraversal,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "policy_name")
@@ -79,13 +79,13 @@ func TestImportRuntimePolicy(t *testing.T) {
 		require.NoError(t, os.WriteFile(policyPath, data, 0600))
 
 		_, output, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "my-policy",
+			Name:     myPolicyName,
 			FilePath: policyPath,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.ImportRuntimePolicyOutput)
-		assert.Equal(t, "my-policy", result.Name)
+		assert.Equal(t, myPolicyName, result.Name)
 		assert.Equal(t, "imported", result.Status)
 
 		// check base64-encoded policy in body
@@ -99,8 +99,8 @@ func TestImportRuntimePolicy(t *testing.T) {
 	t.Run("invalid policy name", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "invalid name",
-			FilePath: "/tmp/policy.json",
+			Name:     invalidPolicyName,
+			FilePath: testPolicyPath,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "policy_name")
@@ -109,7 +109,7 @@ func TestImportRuntimePolicy(t *testing.T) {
 	t.Run("file not found", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "my-policy",
+			Name:     myPolicyName,
 			FilePath: "/tmp/nonexistent-policy-12345.json",
 		})
 		assert.Error(t, err)
@@ -123,7 +123,7 @@ func TestImportRuntimePolicy(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("not json"), 0600))
 
 		_, _, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "my-policy",
+			Name:     myPolicyName,
 			FilePath: path,
 		})
 		assert.Error(t, err)
@@ -133,7 +133,7 @@ func TestImportRuntimePolicy(t *testing.T) {
 	t.Run("relative path rejected", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "my-policy",
+			Name:     myPolicyName,
 			FilePath: "relative/policy.json",
 		})
 		assert.Error(t, err)
@@ -153,7 +153,7 @@ func TestImportRuntimePolicy(t *testing.T) {
 		require.NoError(t, os.WriteFile(policyPath, loadTestdata(t, "valid_runtime_policy.json"), 0600))
 
 		_, _, err := h.ImportRuntimePolicy(context.Background(), nil, keylime.ImportRuntimePolicyInput{
-			Name:     "my-policy",
+			Name:     myPolicyName,
 			FilePath: policyPath,
 		})
 		assert.Error(t, err)
@@ -194,7 +194,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		h := setupMux(t, &putBody)
 
 		_, output, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:  "test-policy",
+			PolicyName:  testPolicyName,
 			AddExcludes: []string{"/var/log"},
 		})
 		require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		h := setupMux(t, &putBody)
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:  "test-policy",
+			PolicyName:  testPolicyName,
 			AddExcludes: []string{"/var/log(/.*)?"},
 		})
 		require.NoError(t, err)
@@ -230,7 +230,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		h := setupMux(t, &putBody)
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:     "test-policy",
+			PolicyName:     testPolicyName,
 			RemoveExcludes: []string{"/tmp(/.*)?"},
 		})
 		require.NoError(t, err)
@@ -247,7 +247,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		digest := "ab0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b8550"
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName: "test-policy",
+			PolicyName: testPolicyName,
 			AddDigests: map[string]string{"/usr/bin/new": digest},
 		})
 		require.NoError(t, err)
@@ -255,7 +255,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		policy := decodePutPolicy(t, putBody)
 		digests := policy["digests"].(map[string]any)
 		assert.Contains(t, digests, "/usr/bin/new")
-		assert.Contains(t, digests, "/bin/bash") // original preserved
+		assert.Contains(t, digests, testBinBash) // original preserved
 	})
 
 	t.Run("remove digests", func(t *testing.T) {
@@ -263,14 +263,14 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		h := setupMux(t, &putBody)
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:    "test-policy",
-			RemoveDigests: []string{"/bin/bash"},
+			PolicyName:    testPolicyName,
+			RemoveDigests: []string{testBinBash},
 		})
 		require.NoError(t, err)
 
 		policy := decodePutPolicy(t, putBody)
 		digests := policy["digests"].(map[string]any)
-		assert.NotContains(t, digests, "/bin/bash")
+		assert.NotContains(t, digests, testBinBash)
 	})
 
 	t.Run("timestamp updated", func(t *testing.T) {
@@ -278,8 +278,8 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 		h := setupMux(t, &putBody)
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:  "test-policy",
-			AddExcludes: []string{"/var"},
+			PolicyName:  testPolicyName,
+			AddExcludes: []string{testVarPath},
 		})
 		require.NoError(t, err)
 
@@ -293,7 +293,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 	t.Run("no operations returns error", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName: "test-policy",
+			PolicyName: testPolicyName,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one of")
@@ -302,8 +302,8 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 	t.Run("invalid policy name", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
-			PolicyName:  "invalid name",
-			AddExcludes: []string{"/var"},
+			PolicyName:  invalidPolicyName,
+			AddExcludes: []string{testVarPath},
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "policy_name")
@@ -319,7 +319,7 @@ func TestUpdateRuntimePolicy(t *testing.T) {
 
 		_, _, err := h.UpdateRuntimePolicy(context.Background(), nil, keylime.UpdateRuntimePolicyInput{
 			PolicyName:  "nonexistent",
-			AddExcludes: []string{"/var"},
+			AddExcludes: []string{testVarPath},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "404")
@@ -335,19 +335,19 @@ func TestDeleteRuntimePolicy(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.DeleteRuntimePolicy(context.Background(), nil, keylime.DeleteRuntimePolicyInput{
-			PolicyName: "test-policy",
+			PolicyName: testPolicyName,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.DeletePolicyOutput)
-		assert.Equal(t, "test-policy", result.PolicyName)
+		assert.Equal(t, testPolicyName, result.PolicyName)
 		assert.Equal(t, "deleted", result.Status)
 	})
 
-	t.Run("invalid name", func(t *testing.T) {
+	t.Run(invalidPolicyName, func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.DeleteRuntimePolicy(context.Background(), nil, keylime.DeleteRuntimePolicyInput{
-			PolicyName: "../evil",
+			PolicyName: pathTraversal,
 		})
 		assert.Error(t, err)
 	})
@@ -366,7 +366,7 @@ func TestListMBPolicies(t *testing.T) {
 		require.NoError(t, err)
 
 		result := output.(keylime.ListMBPoliciesOutput)
-		assert.Equal(t, []string{"test-mb-policy"}, result.Results.MBPolicyNames)
+		assert.Equal(t, []string{testMBPolicyName}, result.Results.MBPolicyNames)
 	})
 }
 
@@ -380,19 +380,19 @@ func TestGetMBPolicy(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.GetMBPolicy(context.Background(), nil, keylime.GetMBPolicyInput{
-			PolicyName: "test-mb-policy",
+			PolicyName: testMBPolicyName,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.GetMBPolicyOutput)
 		assert.Equal(t, 200, result.Code)
-		assert.Equal(t, "test-mb-policy", result.Results["name"])
+		assert.Equal(t, testMBPolicyName, result.Results["name"])
 	})
 
-	t.Run("invalid name", func(t *testing.T) {
+	t.Run(invalidPolicyName, func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.GetMBPolicy(context.Background(), nil, keylime.GetMBPolicyInput{
-			PolicyName: "../evil",
+			PolicyName: pathTraversal,
 		})
 		assert.Error(t, err)
 	})
@@ -429,11 +429,11 @@ func TestImportMBPolicy(t *testing.T) {
 		assert.True(t, json.Valid([]byte(mbPolicy)), "mb_policy must be valid JSON")
 	})
 
-	t.Run("invalid name", func(t *testing.T) {
+	t.Run(invalidPolicyName, func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.ImportMBPolicy(context.Background(), nil, keylime.ImportMBPolicyInput{
-			Name:     "invalid name",
-			FilePath: "/tmp/policy.json",
+			Name:     invalidPolicyName,
+			FilePath: testPolicyPath,
 		})
 		assert.Error(t, err)
 	})
@@ -458,19 +458,19 @@ func TestDeleteMBPolicy(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.DeleteMBPolicy(context.Background(), nil, keylime.DeleteMBPolicyInput{
-			PolicyName: "test-mb-policy",
+			PolicyName: testMBPolicyName,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.DeletePolicyOutput)
-		assert.Equal(t, "test-mb-policy", result.PolicyName)
+		assert.Equal(t, testMBPolicyName, result.PolicyName)
 		assert.Equal(t, "deleted", result.Status)
 	})
 
-	t.Run("invalid name", func(t *testing.T) {
+	t.Run(invalidPolicyName, func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.DeleteMBPolicy(context.Background(), nil, keylime.DeleteMBPolicyInput{
-			PolicyName: "../evil",
+			PolicyName: pathTraversal,
 		})
 		assert.Error(t, err)
 	})

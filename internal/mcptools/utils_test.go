@@ -21,16 +21,16 @@ func TestValidateAgentUUID(t *testing.T) {
 		uuid    string
 		wantErr string
 	}{
-		{"valid lowercase", "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", ""},
+		{"valid lowercase", uuid1, ""},
 		{"valid uppercase", "D432FBB3-D2F1-4A97-9EF7-75BD81C00000", ""},
 		{"valid mixed case", "d432FBB3-d2f1-4A97-9ef7-75bd81C00000", ""},
-		{"empty", "", "agent_uuid is required"},
-		{"too short", "d432fbb3-d2f1-4a97-9ef7", "agent_uuid must be a valid UUID"},
-		{"no dashes", "d432fbb3d2f14a979ef775bd81c00000", "agent_uuid must be a valid UUID"},
-		{"extra chars", "d432fbb3-d2f1-4a97-9ef7-75bd81c00000x", "agent_uuid must be a valid UUID"},
-		{"non-hex chars", "g432fbb3-d2f1-4a97-9ef7-75bd81c00000", "agent_uuid must be a valid UUID"},
-		{"spaces", "d432fbb3 d2f1 4a97 9ef7 75bd81c00000", "agent_uuid must be a valid UUID"},
-		{"just text", "not-a-uuid", "agent_uuid must be a valid UUID"},
+		{testEmpty, "", "agent_uuid is required"},
+		{"too short", "d432fbb3-d2f1-4a97-9ef7", errInvalidUUID},
+		{"no dashes", "d432fbb3d2f14a979ef775bd81c00000", errInvalidUUID},
+		{"extra chars", "d432fbb3-d2f1-4a97-9ef7-75bd81c00000x", errInvalidUUID},
+		{"non-hex chars", "g432fbb3-d2f1-4a97-9ef7-75bd81c00000", errInvalidUUID},
+		{"spaces", "d432fbb3 d2f1 4a97 9ef7 75bd81c00000", errInvalidUUID},
+		{"just text", "not-a-uuid", errInvalidUUID},
 	}
 
 	for _, tt := range tests {
@@ -51,14 +51,14 @@ func TestValidatePolicyName(t *testing.T) {
 		input   string
 		wantErr string
 	}{
-		{"valid simple", "my-policy", ""},
+		{"valid simple", myPolicyName, ""},
 		{"valid with dots", "policy_v2.1", ""},
 		{"valid with underscores", "my_policy_name", ""},
 		{"valid single char", "a", ""},
-		{"empty", "", "policy_name is required"},
+		{testEmpty, "", "policy_name is required"},
 		{"too long", strings.Repeat("a", 256), "policy_name exceeds 255 characters"},
 		{"max length OK", strings.Repeat("a", 255), ""},
-		{"path traversal", "../evil", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
+		{"path traversal", pathTraversal, "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
 		{"semicolon", "name;rm", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
 		{"spaces", "my policy", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
 		{"slash", "path/name", "policy_name contains invalid characters (use alphanumeric, hyphens, underscores, dots)"},
@@ -82,9 +82,9 @@ func TestValidateFilePath(t *testing.T) {
 		path    string
 		wantErr string
 	}{
-		{"valid absolute json", "/tmp/policy.json", ""},
+		{"valid absolute json", testPolicyPath, ""},
 		{"valid nested path", "/var/lib/keylime/policy.json", ""},
-		{"empty", "", "file_path is required"},
+		{testEmpty, "", "file_path is required"},
 		{"relative path", "policy.json", "file_path must be an absolute path"},
 		{"path traversal", "/tmp/../etc/policy.json", "file_path must not contain path traversal"},
 		{"non-json extension", "/tmp/policy.txt", "file_path must have .json extension"},
@@ -113,14 +113,14 @@ func TestNormalizeDigest(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"valid sha256", validSHA256, "/bin/bash", validSHA256, false},
-		{"with sha256 prefix", "sha256:" + validSHA256, "/bin/bash", validSHA256, false},
+		{"valid sha256", validSHA256, testBinBash, validSHA256, false},
+		{"with sha256 prefix", "sha256:" + validSHA256, testBinBash, validSHA256, false},
 		{"valid sha1 length (40 chars)", strings.Repeat("a", 40), "/bin/test", strings.Repeat("a", 40), false},
 		{"max length 128", strings.Repeat("a", 128), "/bin/test", strings.Repeat("a", 128), false},
-		{"too short", "abcdef1234", "/bin/bash", "", true},
-		{"too long", strings.Repeat("a", 129), "/bin/bash", "", true},
-		{"uppercase rejected", "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855", "/bin/bash", "", true},
-		{"non-hex chars", "g3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "/bin/bash", "", true},
+		{"too short", "abcdef1234", testBinBash, "", true},
+		{"too long", strings.Repeat("a", 129), testBinBash, "", true},
+		{"uppercase rejected", "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855", testBinBash, "", true},
+		{"non-hex chars", "g3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", testBinBash, "", true},
 	}
 
 	for _, tt := range tests {
@@ -147,19 +147,19 @@ func TestFilterLogLines(t *testing.T) {
 		{
 			"matches keywords",
 			"line1 ERROR something\nline2 ok\nline3 FAIL here",
-			[]string{"ERROR", "FAIL"},
+			[]string{keywordError, keywordFail},
 			"line1 ERROR something\nline3 FAIL here",
 		},
 		{
 			"no matches",
 			"line1 ok\nline2 fine",
-			[]string{"ERROR"},
+			[]string{keywordError},
 			"",
 		},
 		{
 			"empty input",
 			"",
-			[]string{"ERROR"},
+			[]string{keywordError},
 			"",
 		},
 		{
@@ -171,13 +171,13 @@ func TestFilterLogLines(t *testing.T) {
 		{
 			"case sensitive",
 			"line1 error\nline2 ERROR",
-			[]string{"ERROR"},
+			[]string{keywordError},
 			"line2 ERROR",
 		},
 		{
 			"line matches multiple keywords counted once",
 			"ERROR and FAIL on same line",
-			[]string{"ERROR", "FAIL"},
+			[]string{keywordError, keywordFail},
 			"ERROR and FAIL on same line",
 		},
 	}
@@ -229,7 +229,7 @@ func TestNonNilSlice(t *testing.T) {
 
 func TestMapAgentToOutput(t *testing.T) {
 	t.Run("full field mapping", func(t *testing.T) {
-		agentUUID := "d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
+		agentUUID := uuid1
 		severity := 5
 		eventID := "event-123"
 		lastQuote := 1700000000

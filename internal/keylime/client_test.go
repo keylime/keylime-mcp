@@ -19,7 +19,7 @@ func newTestClient(t *testing.T, handler http.Handler) *Client {
 
 	client, err := newClient(ts.URL, &Config{
 		TLSEnabled: false,
-		APIVersion: "v2.5",
+		APIVersion: testAPIVersion,
 	})
 	require.NoError(t, err)
 	return client
@@ -166,7 +166,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("tls disabled uses http scheme", func(t *testing.T) {
 		client, err := newClient("localhost:8881", &Config{
 			TLSEnabled: false,
-			APIVersion: "v2.5",
+			APIVersion: testAPIVersion,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "http://localhost:8881", client.baseURL)
@@ -175,7 +175,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("strips https prefix", func(t *testing.T) {
 		client, err := newClient("https://localhost:8881", &Config{
 			TLSEnabled: false,
-			APIVersion: "v2.5",
+			APIVersion: testAPIVersion,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "http://localhost:8881", client.baseURL)
@@ -184,7 +184,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("strips http prefix", func(t *testing.T) {
 		client, err := newClient("http://localhost:8881", &Config{
 			TLSEnabled: false,
-			APIVersion: "v2.5",
+			APIVersion: testAPIVersion,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "http://localhost:8881", client.baseURL)
@@ -193,7 +193,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("strips trailing slash", func(t *testing.T) {
 		client, err := newClient("localhost:8881/", &Config{
 			TLSEnabled: false,
-			APIVersion: "v2.5",
+			APIVersion: testAPIVersion,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "http://localhost:8881", client.baseURL)
