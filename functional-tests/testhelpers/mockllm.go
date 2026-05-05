@@ -157,7 +157,7 @@ func NewMCPTestClient(t *testing.T, responses []MockLLMResponse, envOverrides ..
 	bin := ClientBinaryPath(t)
 	serverBin := ServerBinaryPath(t)
 
-	cmd := exec.Command(bin)
+	cmd := exec.Command(bin) // nosemgrep: go.lang.security.audit.dangerous-exec-command
 	env := append(os.Environ(),
 		fmt.Sprintf("PORT=%d", port),
 		fmt.Sprintf("OLLAMA_URL=%s", mockLLM.URL),

@@ -51,7 +51,7 @@ type MCPTestServer struct {
 func NewMCPTestServer(t *testing.T, envOverrides ...string) *MCPTestServer {
 	t.Helper()
 	bin := ServerBinaryPath(t)
-	cmd := exec.Command(bin)
+	cmd := exec.Command(bin) // nosemgrep: go.lang.security.audit.dangerous-exec-command
 	if len(envOverrides) > 0 {
 		cmd.Env = append(os.Environ(), envOverrides...)
 	}
@@ -156,7 +156,7 @@ func StartServerExpectFail(t *testing.T, envOverrides ...string) string {
 	bin := ServerBinaryPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin)
+	cmd := exec.CommandContext(ctx, bin) // nosemgrep: go.lang.security.audit.dangerous-exec-command
 	cmd.Stdin = strings.NewReader("")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
