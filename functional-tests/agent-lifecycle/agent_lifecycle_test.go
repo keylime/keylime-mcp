@@ -34,22 +34,23 @@ func TestAgentLifecycle(t *testing.T) {
 		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
-	t.Run("Enroll_agent_to_verifier", func(t *testing.T) {
+	if !t.Run("Enroll_agent_to_verifier", func(t *testing.T) {
 		result := s.CallTool("Enroll_agent_to_verifier", map[string]any{
 			"agent_uuid":          testhelpers.AgentID,
 			"runtime_policy_name": "",
 			"mb_policy_name":      "",
 		})
 		require.False(t, result.IsError)
-	})
+	}) {
+		t.Fatal("prerequisite failed: Enroll_agent_to_verifier")
+	}
 
 	t.Run("Get_agent_status_after_enrollment", func(t *testing.T) {
-		time.Sleep(3 * time.Second)
-		result := s.CallTool("Get_agent_status", map[string]any{"agent_uuid": testhelpers.AgentID})
-		require.False(t, result.IsError)
+		result := s.PollUntilContains(t, "Get_agent_status",
+			map[string]any{"agent_uuid": testhelpers.AgentID},
+			"operational_state", 15*time.Second, 1*time.Second)
 		text := testhelpers.ExtractText(result)
 		assert.Contains(t, text, maskedAgentID)
-		assert.Contains(t, text, "operational_state")
 	})
 
 	t.Run("Get_verifier_enrolled_agents_after", func(t *testing.T) {
@@ -70,10 +71,12 @@ func TestAgentLifecycle(t *testing.T) {
 		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
-	t.Run("Stop_agent", func(t *testing.T) {
+	if !t.Run("Stop_agent", func(t *testing.T) {
 		result := s.CallTool("Stop_agent", map[string]any{"agent_uuid": testhelpers.AgentID})
 		require.False(t, result.IsError)
-	})
+	}) {
+		t.Fatal("prerequisite failed: Stop_agent")
+	}
 
 	t.Run("Reactivate_agent", func(t *testing.T) {
 		result := s.CallTool("Reactivate_agent", map[string]any{"agent_uuid": testhelpers.AgentID})
@@ -91,22 +94,22 @@ func TestAgentLifecycle(t *testing.T) {
 	})
 
 	t.Run("Get_agent_status_after_update", func(t *testing.T) {
-		time.Sleep(3 * time.Second)
-		result := s.CallTool("Get_agent_status", map[string]any{"agent_uuid": testhelpers.AgentID})
-		require.False(t, result.IsError)
+		result := s.PollUntilContains(t, "Get_agent_status",
+			map[string]any{"agent_uuid": testhelpers.AgentID},
+			maskedAgentID, 15*time.Second, 1*time.Second)
 		assert.Contains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
-	t.Run("Unenroll_agent_from_verifier", func(t *testing.T) {
+	if !t.Run("Unenroll_agent_from_verifier", func(t *testing.T) {
 		result := s.CallTool("Unenroll_agent_from_verifier", map[string]any{"agent_uuid": testhelpers.AgentID})
 		require.False(t, result.IsError)
-	})
+	}) {
+		t.Fatal("prerequisite failed: Unenroll_agent_from_verifier")
+	}
 
 	t.Run("Get_verifier_enrolled_agents_after_unenroll", func(t *testing.T) {
-		time.Sleep(2 * time.Second)
-		result := s.CallTool("Get_verifier_enrolled_agents", map[string]any{})
-		require.False(t, result.IsError)
-		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
+		s.PollUntilNotContains(t, "Get_verifier_enrolled_agents",
+			map[string]any{}, maskedAgentID, 15*time.Second, 1*time.Second)
 	})
 
 	t.Run("Get_all_agents_still_in_registrar", func(t *testing.T) {

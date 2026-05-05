@@ -4,6 +4,7 @@ package errorhandling_test
 
 import (
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,15 +74,25 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("partial_service_failure", func(t *testing.T) {
-		_ = exec.Command("systemctl", "stop", "keylime_verifier").Run()
+		err := exec.Command("systemctl", "stop", "keylime_verifier").Run()
+		require.NoError(t, err, "failed to stop keylime_verifier")
 		defer func() {
-			_ = exec.Command("systemctl", "start", "keylime_verifier").Run()
+			if err := exec.Command("systemctl", "start", "keylime_verifier").Run(); err != nil {
+				t.Logf("WARNING: failed to restart keylime_verifier: %v", err)
+			}
 			time.Sleep(5 * time.Second)
 		}()
-		time.Sleep(2 * time.Second)
-		result := s.CallTool("Get_version_and_health", map[string]any{})
-		require.False(t, result.IsError)
-		text := testhelpers.ExtractText(result)
+		deadline := time.Now().Add(10 * time.Second)
+		var text string
+		for time.Now().Before(deadline) {
+			result := s.CallTool("Get_version_and_health", map[string]any{})
+			require.False(t, result.IsError)
+			text = testhelpers.ExtractText(result)
+			if strings.Contains(text, `"reachable":false`) {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
 		assert.Contains(t, text, `"reachable":false`)
 		assert.Contains(t, text, `"reachable":true`)
 	})

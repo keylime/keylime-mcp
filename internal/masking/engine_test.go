@@ -270,7 +270,7 @@ func TestMaskPreservesNonSensitiveData(t *testing.T) {
 func TestMaskErrorMessage(t *testing.T) {
 	e := NewEngine(true)
 
-	errMsg := "CRITICAL: agent d432fbb3-d2f1-4a97-9ef7-75bd81c00000 at 192.168.1.100 failed attestation"
+	errMsg := "CRITICAL: agent " + testUUID + " at 192.168.1.100 failed attestation"
 	masked := e.Mask(errMsg)
 
 	assert.NotContains(t, masked, testUUID)

@@ -8,7 +8,7 @@ contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
 framework: shell
-test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/agent-lifecycle/
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=270s -tags=functional ./functional-tests/agent-lifecycle/
 require:
   - golang
   - keylime

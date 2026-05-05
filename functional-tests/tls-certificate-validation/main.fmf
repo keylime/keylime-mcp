@@ -7,7 +7,7 @@ contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
 framework: shell
-test: cd ${TMT_TREE} && go test -v -count=1 -timeout=300s -tags=functional ./functional-tests/tls-certificate-validation/
+test: cd ${TMT_TREE} && go test -v -count=1 -timeout=270s -tags=functional ./functional-tests/tls-certificate-validation/
 require:
   - golang
   - keylime

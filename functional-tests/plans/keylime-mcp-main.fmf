@@ -30,6 +30,9 @@ discover:
       - /functional-tests/client-chat-flow
       - /functional-tests/client-model-management
       - /functional-tests/client-error-handling
+  - name: cleanup
+    how: fmf
+    test:
       - /functional-tests/cleanup-keylime-services
 
 execute:

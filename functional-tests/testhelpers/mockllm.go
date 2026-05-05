@@ -133,7 +133,10 @@ type MCPTestClient struct {
 func ClientBinaryPath(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(ProjectRoot(), "bin", "client")
-	if _, err := os.Stat(bin); os.IsNotExist(err) {
+	if _, err := os.Stat(bin); err != nil {
+		if !os.IsNotExist(err) {
+			require.NoError(t, err, "failed to stat client binary")
+		}
 		cmd := exec.Command("make", "-C", ProjectRoot(), "build")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "failed to build client: %s", string(out))

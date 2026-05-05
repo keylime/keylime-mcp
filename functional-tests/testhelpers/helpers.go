@@ -31,7 +31,10 @@ func ProjectRoot() string {
 func ServerBinaryPath(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(ProjectRoot(), "bin", "server")
-	if _, err := os.Stat(bin); os.IsNotExist(err) {
+	if _, err := os.Stat(bin); err != nil {
+		if !os.IsNotExist(err) {
+			require.NoError(t, err, "failed to stat server binary")
+		}
 		cmd := exec.Command("make", "-C", ProjectRoot(), "build-server")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "failed to build server: %s", string(out))
@@ -100,6 +103,36 @@ func (s *MCPTestServer) ListTools() []*mcp.Tool {
 	return result.Tools
 }
 
+func (s *MCPTestServer) PollUntilContains(t *testing.T, tool string, args map[string]any, expected string, timeout, interval time.Duration) *mcp.CallToolResult {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var result *mcp.CallToolResult
+	for time.Now().Before(deadline) {
+		result = s.CallTool(tool, args)
+		if !result.IsError && strings.Contains(ExtractText(result), expected) {
+			return result
+		}
+		time.Sleep(interval)
+	}
+	t.Fatalf("PollUntilContains(%s, %q): timed out after %v", tool, expected, timeout)
+	return nil
+}
+
+func (s *MCPTestServer) PollUntilNotContains(t *testing.T, tool string, args map[string]any, unwanted string, timeout, interval time.Duration) *mcp.CallToolResult {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var result *mcp.CallToolResult
+	for time.Now().Before(deadline) {
+		result = s.CallTool(tool, args)
+		if !result.IsError && !strings.Contains(ExtractText(result), unwanted) {
+			return result
+		}
+		time.Sleep(interval)
+	}
+	t.Fatalf("PollUntilNotContains(%s, %q): timed out after %v", tool, unwanted, timeout)
+	return nil
+}
+
 func ExtractText(result *mcp.CallToolResult) string {
 	var parts []string
 	for _, c := range result.Content {
@@ -121,7 +154,9 @@ func ParseJSON[T any](t *testing.T, result *mcp.CallToolResult) T {
 func StartServerExpectFail(t *testing.T, envOverrides ...string) string {
 	t.Helper()
 	bin := ServerBinaryPath(t)
-	cmd := exec.Command(bin)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin)
 	cmd.Stdin = strings.NewReader("")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

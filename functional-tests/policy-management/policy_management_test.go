@@ -77,6 +77,7 @@ func TestPolicyManagement(t *testing.T) {
 
 	t.Run("List_runtime_policies_after_delete", func(t *testing.T) {
 		result := s.CallTool("List_runtime_policies", map[string]any{})
+		require.False(t, result.IsError)
 		assert.NotContains(t, testhelpers.ExtractText(result), policyName)
 	})
 
