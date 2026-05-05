@@ -23,7 +23,7 @@ func testdataPath(name string) string {
 }
 
 func TestPolicyManagement(t *testing.T) {
-	s := testhelpers.NewMCPTestServer(t)
+	s := testhelpers.NewMCPTestServer(t, "MASKING_ENABLED=false")
 
 	t.Run("List_runtime_policies_initial", func(t *testing.T) {
 		result := s.CallTool("List_runtime_policies", map[string]any{})

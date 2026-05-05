@@ -3,6 +3,7 @@ description: |
     Tests complete agent lifecycle through MCP tools:
     registration, enrollment, status, policies, stop,
     reactivate, update, unenroll, and registrar removal.
+    Runs with data masking enabled.
 contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp

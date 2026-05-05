@@ -11,7 +11,7 @@ import (
 )
 
 func TestBasicAttestation(t *testing.T) {
-	s := testhelpers.NewMCPTestServer(t)
+	s := testhelpers.NewMCPTestServer(t, "MASKING_ENABLED=false")
 
 	t.Run("tools_list", func(t *testing.T) {
 		tools := s.ListTools()

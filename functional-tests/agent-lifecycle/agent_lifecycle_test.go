@@ -11,13 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const maskedAgentID = "AGENT-1"
+
 func TestAgentLifecycle(t *testing.T) {
 	s := testhelpers.NewMCPTestServer(t)
 
 	t.Run("Get_all_agents", func(t *testing.T) {
 		result := s.CallTool("Get_all_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.Contains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.Contains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Get_agent_details", func(t *testing.T) {
@@ -29,7 +31,7 @@ func TestAgentLifecycle(t *testing.T) {
 	t.Run("Get_verifier_enrolled_agents_before", func(t *testing.T) {
 		result := s.CallTool("Get_verifier_enrolled_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.NotContains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Enroll_agent_to_verifier", func(t *testing.T) {
@@ -46,14 +48,14 @@ func TestAgentLifecycle(t *testing.T) {
 		result := s.CallTool("Get_agent_status", map[string]any{"agent_uuid": testhelpers.AgentID})
 		require.False(t, result.IsError)
 		text := testhelpers.ExtractText(result)
-		assert.Contains(t, text, testhelpers.AgentID)
+		assert.Contains(t, text, maskedAgentID)
 		assert.Contains(t, text, "operational_state")
 	})
 
 	t.Run("Get_verifier_enrolled_agents_after", func(t *testing.T) {
 		result := s.CallTool("Get_verifier_enrolled_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.Contains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.Contains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Get_agent_policies", func(t *testing.T) {
@@ -65,7 +67,7 @@ func TestAgentLifecycle(t *testing.T) {
 	t.Run("Get_failed_agents", func(t *testing.T) {
 		result := s.CallTool("Get_failed_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.NotContains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Stop_agent", func(t *testing.T) {
@@ -92,7 +94,7 @@ func TestAgentLifecycle(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		result := s.CallTool("Get_agent_status", map[string]any{"agent_uuid": testhelpers.AgentID})
 		require.False(t, result.IsError)
-		assert.Contains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.Contains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Unenroll_agent_from_verifier", func(t *testing.T) {
@@ -104,13 +106,13 @@ func TestAgentLifecycle(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		result := s.CallTool("Get_verifier_enrolled_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.NotContains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Get_all_agents_still_in_registrar", func(t *testing.T) {
 		result := s.CallTool("Get_all_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.Contains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.Contains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 
 	t.Run("Registrar_remove_agent", func(t *testing.T) {
@@ -121,6 +123,6 @@ func TestAgentLifecycle(t *testing.T) {
 	t.Run("Get_all_agents_after_removal", func(t *testing.T) {
 		result := s.CallTool("Get_all_agents", map[string]any{})
 		require.False(t, result.IsError)
-		assert.NotContains(t, testhelpers.ExtractText(result), testhelpers.AgentID)
+		assert.NotContains(t, testhelpers.ExtractText(result), maskedAgentID)
 	})
 }

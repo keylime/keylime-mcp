@@ -15,7 +15,7 @@ import (
 const fakeUUID = "00000000-0000-0000-0000-000000000000"
 
 func TestErrorHandling(t *testing.T) {
-	s := testhelpers.NewMCPTestServer(t)
+	s := testhelpers.NewMCPTestServer(t, "MASKING_ENABLED=false")
 
 	t.Run("invalid_uuid_format", func(t *testing.T) {
 		s.CallToolExpectError("Get_agent_status", map[string]any{"agent_uuid": "not-a-uuid"})
