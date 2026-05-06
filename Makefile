@@ -80,5 +80,5 @@ test-race:
 test-functional:
 	testing-farm request \
 		--compose Fedora-Rawhide \
-		--plan 'functional-tests/plans/keylime-mcp-main' \
+		--plan 'e2e/plans/keylime-mcp-main' \
 		--arch x86_64,aarch64,ppc64le,s390x

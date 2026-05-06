@@ -1,0 +1,15 @@
+summary: Client error handling - empty message, no pending tool, index page
+description: |
+    Tests the web client error handling including index page serving,
+    empty message rejection, and tool approve/deny without pending requests.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+path: /
+test: go test -v -tags=functional ./e2e/client/error-handling/
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true

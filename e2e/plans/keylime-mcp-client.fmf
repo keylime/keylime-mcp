@@ -1,0 +1,31 @@
+summary: Functional tests for keylime-mcp client
+
+context:
+  swtpm: yes
+  agent: rust
+  faked_measured_boot_log: no
+
+discover:
+  - name: keylime-setup
+    how: fmf
+    url: https://github.com/RedHat-SP-Security/keylime-tests.git
+    ref: main
+    test:
+      - /setup/apply_workarounds
+      - /setup/configure_tpm_emulator
+      - /setup/configure_kernel_ima_module/ima_policy_simple
+      - /setup/enable_keylime_debug_messages
+  - name: mcp-client-tests
+    how: fmf
+    test:
+      - /e2e/provision/setup-keylime-services
+      - /e2e/client/chat-flow
+      - /e2e/client/model-management
+      - /e2e/client/error-handling
+  - name: cleanup
+    how: fmf
+    test:
+      - /e2e/provision/cleanup-keylime-services
+
+execute:
+    how: tmt

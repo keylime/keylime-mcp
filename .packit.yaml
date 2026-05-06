@@ -5,4 +5,4 @@ jobs:
     - fedora-rawhide-x86_64
     - fedora-rawhide-aarch64
   skip_build: true
-  tmt_plan: "/functional-tests/plans/keylime-mcp-main$"
+  tmt_plan: "/e2e/plans/keylime-mcp-main$"

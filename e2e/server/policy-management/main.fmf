@@ -1,0 +1,16 @@
+summary: Runtime and measured boot policy management via MCP server
+description: |
+    Tests policy CRUD operations through MCP tools:
+    import, list, get, update, and delete for both
+    runtime policies and measured boot policies.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+path: /
+test: go test -v -tags=functional ./e2e/server/policy-management/
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true
