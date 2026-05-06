@@ -30,6 +30,12 @@ rlJournalStart
         rlRun "limeWaitForRegistrar"
         rlRun "limeStartAgent"
         rlRun "limeWaitForAgentRegistration ${AGENT_ID}"
+
+        # Generate test policies using upstream keylime-tests helpers
+        rlRun "limeCreateTestPolicy /etc/hostname"
+        rlRun "mkdir -p /var/tmp/keylime-mcp-tests"
+        rlRun "cp policy.json /var/tmp/keylime-mcp-tests/runtime_policy.json"
+        rlRun "echo '{}' > /var/tmp/keylime-mcp-tests/mb_policy.json"
     rlPhaseEnd
 
 rlJournalEnd
