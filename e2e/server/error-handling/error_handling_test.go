@@ -53,6 +53,7 @@ func TestErrorHandling(t *testing.T) {
 			"lines":      10,
 		})
 		require.False(t, result.IsError)
+		assert.NotEmpty(t, helpers.ExtractText(result))
 	})
 
 	t.Run("verifier_logs_errors", func(t *testing.T) {
@@ -62,6 +63,7 @@ func TestErrorHandling(t *testing.T) {
 			"lines":      10,
 		})
 		require.False(t, result.IsError)
+		assert.NotEmpty(t, helpers.ExtractText(result))
 	})
 
 	t.Run("verifier_logs_all", func(t *testing.T) {
@@ -71,6 +73,7 @@ func TestErrorHandling(t *testing.T) {
 			"lines":      10,
 		})
 		require.False(t, result.IsError)
+		assert.NotEmpty(t, helpers.ExtractText(result))
 	})
 
 	t.Run("partial_service_failure", func(t *testing.T) {
@@ -86,7 +89,10 @@ func TestErrorHandling(t *testing.T) {
 		var text string
 		for time.Now().Before(deadline) {
 			result := s.CallTool("Get_version_and_health", map[string]any{})
-			require.False(t, result.IsError)
+			if result.IsError {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
 			text = helpers.ExtractText(result)
 			if strings.Contains(text, `"reachable":false`) {
 				break

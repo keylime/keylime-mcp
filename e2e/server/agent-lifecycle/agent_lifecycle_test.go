@@ -46,7 +46,7 @@ func TestAgentLifecycle(t *testing.T) {
 	}
 
 	t.Run("Get_agent_status_after_enrollment", func(t *testing.T) {
-		result := s.PollUntilContains(t, "Get_agent_status",
+		result := s.PollUntilContains("Get_agent_status",
 			map[string]any{"agent_uuid": helpers.AgentID},
 			"operational_state", 15*time.Second, 1*time.Second)
 		text := helpers.ExtractText(result)
@@ -78,10 +78,12 @@ func TestAgentLifecycle(t *testing.T) {
 		t.Fatal("prerequisite failed: Stop_agent")
 	}
 
-	t.Run("Reactivate_agent", func(t *testing.T) {
+	if !t.Run("Reactivate_agent", func(t *testing.T) {
 		result := s.CallTool("Reactivate_agent", map[string]any{"agent_uuid": helpers.AgentID})
 		require.False(t, result.IsError)
-	})
+	}) {
+		t.Fatal("prerequisite failed: Reactivate_agent")
+	}
 
 	t.Run("Update_agent", func(t *testing.T) {
 		result := s.CallTool("Update_agent", map[string]any{
@@ -94,7 +96,7 @@ func TestAgentLifecycle(t *testing.T) {
 	})
 
 	t.Run("Get_agent_status_after_update", func(t *testing.T) {
-		result := s.PollUntilContains(t, "Get_agent_status",
+		result := s.PollUntilContains("Get_agent_status",
 			map[string]any{"agent_uuid": helpers.AgentID},
 			maskedAgentID, 15*time.Second, 1*time.Second)
 		assert.Contains(t, helpers.ExtractText(result), maskedAgentID)
@@ -108,7 +110,7 @@ func TestAgentLifecycle(t *testing.T) {
 	}
 
 	t.Run("Get_verifier_enrolled_agents_after_unenroll", func(t *testing.T) {
-		s.PollUntilNotContains(t, "Get_verifier_enrolled_agents",
+		s.PollUntilNotContains("Get_verifier_enrolled_agents",
 			map[string]any{}, maskedAgentID, 15*time.Second, 1*time.Second)
 	})
 

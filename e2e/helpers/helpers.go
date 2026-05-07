@@ -103,8 +103,8 @@ func (s *MCPTestServer) ListTools() []*mcp.Tool {
 	return result.Tools
 }
 
-func (s *MCPTestServer) PollUntilContains(t *testing.T, tool string, args map[string]any, expected string, timeout, interval time.Duration) *mcp.CallToolResult {
-	t.Helper()
+func (s *MCPTestServer) PollUntilContains(tool string, args map[string]any, expected string, timeout, interval time.Duration) *mcp.CallToolResult {
+	s.T.Helper()
 	deadline := time.Now().Add(timeout)
 	var result *mcp.CallToolResult
 	for time.Now().Before(deadline) {
@@ -114,12 +114,12 @@ func (s *MCPTestServer) PollUntilContains(t *testing.T, tool string, args map[st
 		}
 		time.Sleep(interval)
 	}
-	t.Fatalf("PollUntilContains(%s, %q): timed out after %v", tool, expected, timeout)
+	s.T.Fatalf("PollUntilContains(%s, %q): timed out after %v", tool, expected, timeout)
 	return nil
 }
 
-func (s *MCPTestServer) PollUntilNotContains(t *testing.T, tool string, args map[string]any, unwanted string, timeout, interval time.Duration) *mcp.CallToolResult {
-	t.Helper()
+func (s *MCPTestServer) PollUntilNotContains(tool string, args map[string]any, unwanted string, timeout, interval time.Duration) *mcp.CallToolResult {
+	s.T.Helper()
 	deadline := time.Now().Add(timeout)
 	var result *mcp.CallToolResult
 	for time.Now().Before(deadline) {
@@ -129,7 +129,7 @@ func (s *MCPTestServer) PollUntilNotContains(t *testing.T, tool string, args map
 		}
 		time.Sleep(interval)
 	}
-	t.Fatalf("PollUntilNotContains(%s, %q): timed out after %v", tool, unwanted, timeout)
+	s.T.Fatalf("PollUntilNotContains(%s, %q): timed out after %v", tool, unwanted, timeout)
 	return nil
 }
 

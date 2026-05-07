@@ -47,14 +47,16 @@ func TestBasicAttestation(t *testing.T) {
 		assert.Contains(t, helpers.ExtractText(result), "aik_tpm")
 	})
 
-	t.Run("Enroll_agent_to_verifier", func(t *testing.T) {
+	if !t.Run("Enroll_agent_to_verifier", func(t *testing.T) {
 		result := s.CallTool("Enroll_agent_to_verifier", map[string]any{
 			"agent_uuid":          helpers.AgentID,
 			"runtime_policy_name": "",
 			"mb_policy_name":      "",
 		})
 		require.False(t, result.IsError)
-	})
+	}) {
+		t.Fatal("prerequisite failed: Enroll_agent_to_verifier")
+	}
 
 	t.Run("Get_agent_status_after_enrollment", func(t *testing.T) {
 		result := s.CallTool("Get_agent_status", map[string]any{"agent_uuid": helpers.AgentID})
