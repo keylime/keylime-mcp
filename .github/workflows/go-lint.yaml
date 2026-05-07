@@ -41,4 +41,5 @@ jobs:
       - name: Run gosec (informational)
         continue-on-error: true
         run: |
-          bash ./hack/gosec.sh
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -severity medium -confidence medium ./...
