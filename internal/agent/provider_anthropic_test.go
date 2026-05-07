@@ -30,7 +30,7 @@ func TestConvertMessagesToAnthropic(t *testing.T) {
 				Role: RoleAssistant,
 				Text: "Let me help",
 				ToolCalls: []ToolRequest{
-					{ID: testCallID1, Name: "Get_agent_status", Arguments: map[string]any{testArgUUID: testUUID}},
+					{ID: testCallID1, Name: testToolGetStatus, Arguments: map[string]any{testArgUUID: testUUID}},
 				},
 			},
 		}
@@ -88,7 +88,7 @@ func TestConvertMessagesToAnthropic(t *testing.T) {
 				Role: RoleAssistant,
 				Text: "Let me check",
 				ToolCalls: []ToolRequest{
-					{ID: testCallID1, Name: "Get_agent_status", Arguments: map[string]any{testArgUUID: testUUID}},
+					{ID: testCallID1, Name: testToolGetStatus, Arguments: map[string]any{testArgUUID: testUUID}},
 				},
 			},
 			{
@@ -165,7 +165,7 @@ func TestConvertToolsToAnthropic(t *testing.T) {
 func TestConvertMCPToolToAnthropic(t *testing.T) {
 	t.Run("extracts properties and required", func(t *testing.T) {
 		tool := &mcp.Tool{
-			Name:        "Get_agent_status",
+			Name:        testToolGetStatus,
 			Description: "Gets agent attestation status",
 			InputSchema: map[string]any{
 				testSchemaProperties: map[string]any{
@@ -178,7 +178,7 @@ func TestConvertMCPToolToAnthropic(t *testing.T) {
 		result := convertMCPToolToAnthropic(tool)
 
 		require.NotNil(t, result.OfTool)
-		assert.Equal(t, "Get_agent_status", result.OfTool.Name)
+		assert.Equal(t, testToolGetStatus, result.OfTool.Name)
 		assert.Equal(t, "Gets agent attestation status", result.OfTool.Description.Value)
 		assert.Equal(t, "object", string(result.OfTool.InputSchema.Type))
 		assert.NotNil(t, result.OfTool.InputSchema.Properties)
@@ -230,7 +230,7 @@ func TestParseAnthropicResponse(t *testing.T) {
 			"model": "claude-3-5-sonnet-20241022",
 			"content": [
 				{"type": "text", "text": "Let me help", "citations": []},
-				{"type": "tool_use", "id": "` + testCallID1 + `", "name": "Get_agent_status", "input": {"agent_uuid": "` + testUUID + `"}}
+				{"type": "tool_use", "id": "` + testCallID1 + `", "name": "` + testToolGetStatus + `", "input": {"agent_uuid": "` + testUUID + `"}}
 			],
 			"stop_reason": "tool_use",
 			"stop_sequence": "",
@@ -247,7 +247,7 @@ func TestParseAnthropicResponse(t *testing.T) {
 		assert.Equal(t, "Let me help", result.TextBlocks[0])
 		require.Len(t, result.ToolUses, 1)
 		assert.Equal(t, testCallID1, result.ToolUses[0].ID)
-		assert.Equal(t, "Get_agent_status", result.ToolUses[0].Name)
+		assert.Equal(t, testToolGetStatus, result.ToolUses[0].Name)
 
 		var inputMap map[string]any
 		err = json.Unmarshal(result.ToolUses[0].Arguments.(json.RawMessage), &inputMap)

@@ -261,7 +261,7 @@ func TestExecuteTool(t *testing.T) {
 			},
 			provider: &mockProvider{response: &LLMResponse{TextBlocks: []string{"sorry"}}},
 		})
-		a.toolQueue = []ToolRequest{{ID: "t1", Name: "Get_agent_status"}}
+		a.toolQueue = []ToolRequest{{ID: "t1", Name: testToolGetStatus}}
 
 		var received []Message
 		err := a.ExecuteTool(ctx, &a.toolQueue[0], func(m Message) { received = append(received, m) })
@@ -269,7 +269,7 @@ func TestExecuteTool(t *testing.T) {
 
 		require.NotEmpty(t, received)
 		assert.True(t, received[0].ToolResult.IsError)
-		assert.Contains(t, received[0].ToolResult.Output, "Get_agent_status")
+		assert.Contains(t, received[0].ToolResult.Output, testToolGetStatus)
 		assert.Contains(t, received[0].ToolResult.Output, "agent not found")
 	})
 
@@ -316,7 +316,7 @@ func TestExecuteTool(t *testing.T) {
 		})
 		a.toolQueue = []ToolRequest{{
 			ID:        "t1",
-			Name:      "Get_agent_status",
+			Name:      testToolGetStatus,
 			Arguments: map[string]any{"agent_uuid": "AGENT-1"},
 		}}
 

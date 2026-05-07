@@ -17,6 +17,7 @@ const (
 	testSchemaRequired   = "required"
 	testSchemaType       = "type"
 	testArgUUID          = "agent_uuid"
+	testToolGetStatus    = "Get_agent_status"
 )
 
 type mockProvider struct {
