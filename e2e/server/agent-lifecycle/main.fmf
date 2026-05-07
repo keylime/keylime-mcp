@@ -1,0 +1,16 @@
+summary: Full agent lifecycle via MCP server
+description: |
+    Tests complete agent lifecycle through MCP tools:
+    registration, enrollment, status, policies, stop,
+    reactivate, update, unenroll, and registrar removal.
+    Runs with data masking enabled.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+test: go test -v -tags=functional .
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true

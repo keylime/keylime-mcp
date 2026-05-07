@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testAPIVersion = "v2.5"
+
 func loadTestdata(t *testing.T, name string) []byte {
 	t.Helper()
 	data, err := os.ReadFile("testdata/" + name) // #nosec G304 -- test helper, name is hardcoded in tests
@@ -24,7 +26,7 @@ func newTestService(t *testing.T, handler http.Handler) *Service {
 		VerifierURL:  ts.URL,
 		RegistrarURL: ts.URL,
 		TLSEnabled:   false,
-		APIVersion:   "v2.5",
+		APIVersion:   testAPIVersion,
 	})
 	require.NoError(t, err)
 	return svc

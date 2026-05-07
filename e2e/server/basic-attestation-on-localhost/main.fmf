@@ -1,0 +1,15 @@
+summary: Basic attestation scenario via MCP server
+description: |
+    Tests MCP protocol initialization, tool listing,
+    health check, agent enrollment, status and unenrollment
+    against a running keylime instance.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+test: go test -v -tags=functional .
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true

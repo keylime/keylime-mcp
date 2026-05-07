@@ -26,8 +26,8 @@ func TestGetAllAgents(t *testing.T) {
 
 		result := output.(keylime.GetAllAgentsOutput)
 		assert.Equal(t, []string{
-			"d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
-			"d432fbb3-d2f1-4a97-9ef7-75bd81c11111",
+			uuid1,
+			uuid2,
 		}, result.Agents)
 	})
 
@@ -58,8 +58,8 @@ func TestGetVerifierEnrolledAgents(t *testing.T) {
 
 		result := output.(keylime.GetVerifierEnrolledAgentsOutput)
 		assert.Equal(t, []string{
-			"d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
-			"d432fbb3-d2f1-4a97-9ef7-75bd81c11111",
+			uuid1,
+			uuid2,
 		}, result.Agents)
 	})
 
@@ -99,12 +99,12 @@ func TestGetAgentStatus(t *testing.T) {
 		}))
 
 		_, output, err := h.GetAgentStatus(context.Background(), nil, keylime.GetAgentStatusInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.GetAgentStatusOutput)
-		assert.Equal(t, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", result.AgentUUID)
+		assert.Equal(t, uuid1, result.AgentUUID)
 		assert.Equal(t, keylime.StateGetQuote, result.OperationalState)
 		assert.Equal(t, "Get Quote", result.OperationalStateDescription)
 		assert.Equal(t, 42, result.AttestationCount)
@@ -132,12 +132,6 @@ func TestGetAgentStatus(t *testing.T) {
 }
 
 func TestGetFailedAgents(t *testing.T) {
-	const (
-		uuid1 = "d432fbb3-d2f1-4a97-9ef7-75bd81c00000" // healthy
-		uuid2 = "d432fbb3-d2f1-4a97-9ef7-75bd81c11111" // failed (state 7)
-		uuid3 = "d432fbb3-d2f1-4a97-9ef7-75bd81c22222" // invalid quote (state 9)
-	)
-
 	t.Run("returns only failed agents", func(t *testing.T) {
 		statusHealthy := loadTestdata(t, "agent_status.json")
 		statusFailed := loadTestdata(t, "agent_status_failed.json")
@@ -248,7 +242,7 @@ func TestReactivateAgent(t *testing.T) {
 		}))
 
 		_, output, err := h.ReactivateAgent(context.Background(), nil, keylime.ReactivateAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -259,7 +253,7 @@ func TestReactivateAgent(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.ReactivateAgent(context.Background(), nil, keylime.ReactivateAgentInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -273,12 +267,12 @@ func TestGetAgentPolicies(t *testing.T) {
 		}))
 
 		_, output, err := h.GetAgentPolicies(context.Background(), nil, keylime.GetAgentPoliciesInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.GetAgentPoliciesOutput)
-		assert.Equal(t, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", result.AgentUUID)
+		assert.Equal(t, uuid1, result.AgentUUID)
 		assert.False(t, result.HasMeasuredBootPolicy) // has_mb_refstate: 0
 		assert.True(t, result.HasRuntimePolicy)       // has_runtime_policy: 1
 		assert.Equal(t, []string{"sha256"}, result.AcceptedTPMHashAlgs)
@@ -293,7 +287,7 @@ func TestGetAgentPolicies(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.GetAgentPolicies(context.Background(), nil, keylime.GetAgentPoliciesInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -307,7 +301,7 @@ func TestRegistrarGetAgentDetails(t *testing.T) {
 		}))
 
 		_, output, err := h.RegistrarGetAgentDetails(context.Background(), nil, keylime.RegistrarGetAgentDetailsInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -322,7 +316,7 @@ func TestRegistrarGetAgentDetails(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.RegistrarGetAgentDetails(context.Background(), nil, keylime.RegistrarGetAgentDetailsInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -342,7 +336,7 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.EnrollAgentToVerifier(context.Background(), nil, keylime.EnrollAgentToVerifierInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -370,8 +364,8 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, _, err := h.EnrollAgentToVerifier(context.Background(), nil, keylime.EnrollAgentToVerifierInput{
-			AgentUUID:         "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
-			RuntimePolicyName: "test-policy",
+			AgentUUID:         uuid1,
+			RuntimePolicyName: testPolicyName,
 		})
 		require.NoError(t, err)
 
@@ -390,7 +384,7 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.EnrollAgentToVerifier(context.Background(), nil, keylime.EnrollAgentToVerifierInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "agent_uuid")
@@ -399,7 +393,7 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 	t.Run("invalid runtime policy name", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.EnrollAgentToVerifier(context.Background(), nil, keylime.EnrollAgentToVerifierInput{
-			AgentUUID:         "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID:         uuid1,
 			RuntimePolicyName: "invalid name with spaces",
 		})
 		assert.Error(t, err)
@@ -409,8 +403,8 @@ func TestEnrollAgentToVerifier(t *testing.T) {
 	t.Run("invalid mb policy name", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.EnrollAgentToVerifier(context.Background(), nil, keylime.EnrollAgentToVerifierInput{
-			AgentUUID:    "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
-			MbPolicyName: "../evil",
+			AgentUUID:    uuid1,
+			MbPolicyName: pathTraversal,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mb_policy_name")
@@ -434,12 +428,12 @@ func TestUpdateAgent(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, output, err := h.UpdateAgent(context.Background(), nil, keylime.UpdateAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
 		result := output.(keylime.UpdateAgentOutput)
-		assert.Equal(t, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000", result.AgentUUID)
+		assert.Equal(t, uuid1, result.AgentUUID)
 		assert.Equal(t, "updated", result.Status)
 	})
 
@@ -456,7 +450,7 @@ func TestUpdateAgent(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, _, err := h.UpdateAgent(context.Background(), nil, keylime.UpdateAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unenroll")
@@ -479,11 +473,11 @@ func TestUpdateAgent(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, _, err := h.UpdateAgent(context.Background(), nil, keylime.UpdateAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "CRITICAL")
-		assert.Contains(t, err.Error(), "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+		assert.Contains(t, err.Error(), uuid1)
 	})
 
 	t.Run("prep failure prevents unenroll", func(t *testing.T) {
@@ -501,7 +495,7 @@ func TestUpdateAgent(t *testing.T) {
 		h := newTestHandler(t, mux)
 
 		_, _, err := h.UpdateAgent(context.Background(), nil, keylime.UpdateAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		assert.Error(t, err)
 		assert.False(t, deleteCalled, "DELETE must not be called if PrepareEnrollmentBody fails")
@@ -510,7 +504,7 @@ func TestUpdateAgent(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.UpdateAgent(context.Background(), nil, keylime.UpdateAgentInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -525,7 +519,7 @@ func TestUnenrollAgentFromVerifier(t *testing.T) {
 		}))
 
 		_, output, err := h.UnenrollAgentFromVerifier(context.Background(), nil, keylime.UnenrollAgentFromVerifierInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -536,7 +530,7 @@ func TestUnenrollAgentFromVerifier(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.UnenrollAgentFromVerifier(context.Background(), nil, keylime.UnenrollAgentFromVerifierInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -551,7 +545,7 @@ func TestStopAgent(t *testing.T) {
 		}))
 
 		_, output, err := h.StopAgent(context.Background(), nil, keylime.StopAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -562,7 +556,7 @@ func TestStopAgent(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.StopAgent(context.Background(), nil, keylime.StopAgentInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})
@@ -577,7 +571,7 @@ func TestRegistrarRemoveAgent(t *testing.T) {
 		}))
 
 		_, output, err := h.RegistrarRemoveAgent(context.Background(), nil, keylime.RegistrarRemoveAgentInput{
-			AgentUUID: "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			AgentUUID: uuid1,
 		})
 		require.NoError(t, err)
 
@@ -588,7 +582,7 @@ func TestRegistrarRemoveAgent(t *testing.T) {
 	t.Run("invalid uuid", func(t *testing.T) {
 		h := newTestHandler(t, http.NotFoundHandler())
 		_, _, err := h.RegistrarRemoveAgent(context.Background(), nil, keylime.RegistrarRemoveAgentInput{
-			AgentUUID: "bad",
+			AgentUUID: badUUID,
 		})
 		assert.Error(t, err)
 	})

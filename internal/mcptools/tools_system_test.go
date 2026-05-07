@@ -119,7 +119,7 @@ func TestInvestigateVerifierLogs(t *testing.T) {
 		}
 
 		h := newTestHandler(t, http.NotFoundHandler())
-		for _, filter := range []string{"all", "attestation_failures", "errors"} {
+		for _, filter := range []string{testFilterAll, "attestation_failures", "errors"} {
 			t.Run(filter, func(t *testing.T) {
 				_, output, err := h.InvestigateVerifierLogs(context.Background(), nil, keylime.InvestigateVerifierLogsInput{
 					Filter: filter,
@@ -144,6 +144,6 @@ func TestInvestigateVerifierLogs(t *testing.T) {
 		require.NoError(t, err)
 
 		result := output.(keylime.InvestigateVerifierLogsOutput)
-		assert.Equal(t, "all", result.FilterApplied)
+		assert.Equal(t, testFilterAll, result.FilterApplied)
 	})
 }

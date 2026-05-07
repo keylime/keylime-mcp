@@ -1,0 +1,8 @@
+jobs:
+- job: tests
+  trigger: pull_request
+  targets:
+    - fedora-rawhide-x86_64
+    - fedora-rawhide-aarch64
+  skip_build: true
+  tmt_plan: "/e2e/plans/keylime-mcp-main$"

@@ -14,15 +14,10 @@ name: build
 jobs:
   build:
     runs-on: ubuntu-latest
-    continue-on-error: ${{ ! matrix.stable }}
     strategy:
       matrix:
         os:
           - fedora:latest
-        stable: [true]
-        include:
-          - os: quay.io/fedora/fedora:rawhide
-            stable: false
     steps:
       - uses: actions/checkout@v5
 

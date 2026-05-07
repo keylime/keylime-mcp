@@ -1,0 +1,16 @@
+summary: TLS certificate validation for MCP server
+description: |
+    Tests TLS behavior: valid mTLS, wrong CA certificate,
+    missing client certificate, SNI hostname mismatch,
+    and TLS disabled mode.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+test: go test -v -tags=functional .
+require:
+  - golang
+  - keylime
+  - openssl
+duration: 5m
+enabled: true

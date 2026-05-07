@@ -35,29 +35,17 @@ func TestStateToString(t *testing.T) {
 }
 
 func TestIsFailedState(t *testing.T) {
-	tests := []struct {
-		name     string
-		state    int
-		expected bool
-	}{
-		{"Registered", StateRegistered, false},
-		{"Start", StateStart, false},
-		{"Saved", StateSaved, false},
-		{"GetQuote", StateGetQuote, false},
-		{"GetQuoteRetry", StateGetQuoteRetry, false},
-		{"ProvideV", StateProvideV, false},
-		{"ProvideVRetry", StateProvideVRetry, false},
-		{"Failed", StateFailed, true},
-		{"Terminated", StateTerminated, false},
-		{"InvalidQuote", StateInvalidQuote, true},
-		{"TenantFailed", StateTenantFailed, true},
-		{"Unknown", 99, false},
-		{"Unknown negative", -1, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, IsFailedState(tt.state))
-		})
-	}
+	assert.False(t, IsFailedState(StateRegistered))
+	assert.False(t, IsFailedState(StateStart))
+	assert.False(t, IsFailedState(StateSaved))
+	assert.False(t, IsFailedState(StateGetQuote))
+	assert.False(t, IsFailedState(StateGetQuoteRetry))
+	assert.False(t, IsFailedState(StateProvideV))
+	assert.False(t, IsFailedState(StateProvideVRetry))
+	assert.True(t, IsFailedState(StateFailed))
+	assert.False(t, IsFailedState(StateTerminated))
+	assert.True(t, IsFailedState(StateInvalidQuote))
+	assert.True(t, IsFailedState(StateTenantFailed))
+	assert.False(t, IsFailedState(99))
+	assert.False(t, IsFailedState(-1))
 }

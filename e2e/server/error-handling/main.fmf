@@ -1,0 +1,14 @@
+summary: Error handling and edge cases for MCP server
+description: |
+    Tests error responses for invalid inputs, non-existent
+    resources, verifier log queries, and partial service failures.
+contact: Marek Safarik <msafarik@redhat.com>
+component:
+  - keylime-mcp
+framework: shell
+test: go test -v -tags=functional .
+require:
+  - golang
+  - keylime
+duration: 5m
+enabled: true

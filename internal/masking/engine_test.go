@@ -9,15 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+const (
+	testSHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	testUUID   = "d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
+)
 
 func TestMaskUUIDs(t *testing.T) {
 	e := NewEngine(true)
 
-	text := `{"agents":["d432fbb3-d2f1-4a97-9ef7-75bd81c00000","a1b2c3d4-e5f6-7890-abcd-ef1234567890"]}`
+	text := `{"agents":["` + testUUID + `","a1b2c3d4-e5f6-7890-abcd-ef1234567890"]}`
 	masked := e.Mask(text)
 
-	assert.NotContains(t, masked, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+	assert.NotContains(t, masked, testUUID)
 	assert.NotContains(t, masked, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	assert.Contains(t, masked, "AGENT-1")
 	assert.Contains(t, masked, "AGENT-2")
@@ -26,7 +29,7 @@ func TestMaskUUIDs(t *testing.T) {
 func TestMaskUUIDDeterministic(t *testing.T) {
 	e := NewEngine(true)
 
-	uuid := "d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
+	uuid := testUUID
 	text1 := `{"agent":"` + uuid + `"}`
 	text2 := `{"other":"` + uuid + `"}`
 
@@ -114,7 +117,7 @@ func TestMaskTPMRoundtrip(t *testing.T) {
 func TestUnmask(t *testing.T) {
 	e := NewEngine(true)
 
-	uuid := "d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
+	uuid := testUUID
 	ip := "192.168.1.100"
 	hash := testSHA256
 
@@ -143,7 +146,7 @@ func TestUnmaskUnknownAlias(t *testing.T) {
 func TestDisabledEngine(t *testing.T) {
 	e := NewEngine(false)
 
-	text := `{"uuid":"d432fbb3-d2f1-4a97-9ef7-75bd81c00000","ip":"192.168.1.100"}`
+	text := `{"uuid":"` + testUUID + `","ip":"192.168.1.100"}`
 
 	assert.Equal(t, text, e.Mask(text))
 	assert.Equal(t, text, e.Unmask(text))
@@ -154,7 +157,7 @@ func TestMaskAgentStatusPayload(t *testing.T) {
 	e := NewEngine(true)
 
 	payload := map[string]any{
-		"agent_uuid":                    "d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+		"agent_uuid":                    testUUID,
 		"operational_state":             3,
 		"operational_state_description": "Get Quote",
 		"attestation_count":             42,
@@ -172,7 +175,7 @@ func TestMaskAgentStatusPayload(t *testing.T) {
 
 	masked := e.Mask(string(data))
 
-	assert.NotContains(t, masked, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+	assert.NotContains(t, masked, testUUID)
 	assert.NotContains(t, masked, "127.0.0.1")
 	assert.Contains(t, masked, "AGENT-1")
 	assert.Contains(t, masked, "HOST-1")
@@ -222,7 +225,7 @@ func TestMaskMultipleAgentsPayload(t *testing.T) {
 
 	payload := map[string]any{
 		"agents": []string{
-			"d432fbb3-d2f1-4a97-9ef7-75bd81c00000",
+			testUUID,
 			"a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 			"11111111-2222-3333-4444-555555555555",
 		},
@@ -238,7 +241,7 @@ func TestMaskMultipleAgentsPayload(t *testing.T) {
 	assert.Contains(t, masked, "AGENT-3")
 
 	unmasked := e.Unmask(masked)
-	assert.Contains(t, unmasked, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+	assert.Contains(t, unmasked, testUUID)
 	assert.Contains(t, unmasked, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	assert.Contains(t, unmasked, "11111111-2222-3333-4444-555555555555")
 }
@@ -246,7 +249,7 @@ func TestMaskMultipleAgentsPayload(t *testing.T) {
 func TestMaskRoundtrip(t *testing.T) {
 	e := NewEngine(true)
 
-	original := `{"uuid":"d432fbb3-d2f1-4a97-9ef7-75bd81c00000","ip":"10.0.0.1","hash":"` + testSHA256 + `"}`
+	original := `{"uuid":"` + testUUID + `","ip":"10.0.0.1","hash":"` + testSHA256 + `"}`
 
 	masked := e.Mask(original)
 	assert.NotEqual(t, original, masked)
@@ -267,10 +270,10 @@ func TestMaskPreservesNonSensitiveData(t *testing.T) {
 func TestMaskErrorMessage(t *testing.T) {
 	e := NewEngine(true)
 
-	errMsg := "CRITICAL: agent d432fbb3-d2f1-4a97-9ef7-75bd81c00000 at 192.168.1.100 failed attestation"
+	errMsg := "CRITICAL: agent " + testUUID + " at 192.168.1.100 failed attestation"
 	masked := e.Mask(errMsg)
 
-	assert.NotContains(t, masked, "d432fbb3-d2f1-4a97-9ef7-75bd81c00000")
+	assert.NotContains(t, masked, testUUID)
 	assert.NotContains(t, masked, "192.168.1.100")
 	assert.Contains(t, masked, "AGENT-1")
 	assert.Contains(t, masked, "HOST-1")
