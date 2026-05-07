@@ -76,6 +76,7 @@ func TestHandleChat(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		s.handleChat(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
 
 		events := drainEvents(ch, 2*time.Second)
 		var hasToolRequest bool
@@ -100,6 +101,7 @@ func TestHandleChat(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		s.handleChat(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
 
 		events := drainEvents(ch, 2*time.Second)
 		var hasError bool
@@ -246,6 +248,7 @@ func TestHandleListModels(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		s.handleListModels(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
 
 		var resp struct {
 			Models       []agent.ModelInfo `json:"models"`

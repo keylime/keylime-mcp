@@ -34,6 +34,8 @@ func (p *stubProvider) Chat(_ context.Context, opts agent.ChatOptions) (*agent.L
 }
 
 func (p *stubProvider) ListModels(_ context.Context) ([]agent.ModelInfo, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.models, p.modelsErr
 }
 
