@@ -7,8 +7,7 @@ contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
 framework: shell
-path: /
-test: go test -v -tags=functional ./e2e/client/chat-flow/
+test: go test -v -tags=functional .
 require:
   - golang
   - keylime

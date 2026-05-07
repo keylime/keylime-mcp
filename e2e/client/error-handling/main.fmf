@@ -6,8 +6,7 @@ contact: Marek Safarik <msafarik@redhat.com>
 component:
   - keylime-mcp
 framework: shell
-path: /
-test: go test -v -tags=functional ./e2e/client/error-handling/
+test: go test -v -tags=functional .
 require:
   - golang
   - keylime
