@@ -20,6 +20,11 @@ import (
 //go:embed templates/*
 var templatesFS embed.FS
 
+const (
+	eventError     = "error"
+	providerOllama = "ollama"
+)
+
 // Server represents the web server for the chat interface
 type Server struct {
 	agent     *agent.Agent
@@ -125,8 +130,8 @@ func (s *Server) processMessage(message string) {
 	if err != nil {
 		log.Printf("[ERROR] Agent error: %v", err)
 		s.send(SSEvent{
-			Event: "error",
-			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
+			Event: eventError,
+			Data:  s.renderMessage(eventError, fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}
 
@@ -188,8 +193,8 @@ func (s *Server) handleToolDeny(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[ERROR] Tool deny response error: %v", err)
 		s.send(SSEvent{
-			Event: "error",
-			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
+			Event: eventError,
+			Data:  s.renderMessage(eventError, fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}
 
@@ -209,8 +214,8 @@ func (s *Server) executeTool(tool *agent.ToolRequest) {
 	if err != nil {
 		log.Printf("[ERROR] Tool execution error: %v", err)
 		s.send(SSEvent{
-			Event: "error",
-			Data:  s.renderMessage("error", fmt.Sprintf("Error: %v", err), "", nil),
+			Event: eventError,
+			Data:  s.renderMessage(eventError, fmt.Sprintf("Error: %v", err), "", nil),
 		})
 	}
 
@@ -308,9 +313,9 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 		models, err := p.ListModels(r.Context())
 		if err != nil {
 			log.Printf("[MODELS] Failed to list %s models: %v", p.Name(), err)
-			if p.Name() == "ollama" {
+			if p.Name() == providerOllama {
 				ollamaStatus = "not_running"
-				if _, err := exec.LookPath("ollama"); err != nil {
+				if _, err := exec.LookPath(providerOllama); err != nil {
 					ollamaStatus = "not_installed"
 				}
 			}
