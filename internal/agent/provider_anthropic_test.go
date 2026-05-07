@@ -249,8 +249,10 @@ func TestParseAnthropicResponse(t *testing.T) {
 		assert.Equal(t, testCallID1, result.ToolUses[0].ID)
 		assert.Equal(t, testToolGetStatus, result.ToolUses[0].Name)
 
+		rawArgs, ok := result.ToolUses[0].Arguments.(json.RawMessage)
+		require.True(t, ok, "Arguments should be json.RawMessage, got %T", result.ToolUses[0].Arguments)
 		var inputMap map[string]any
-		err = json.Unmarshal(result.ToolUses[0].Arguments.(json.RawMessage), &inputMap)
+		err = json.Unmarshal(rawArgs, &inputMap)
 		require.NoError(t, err)
 		assert.Equal(t, testUUID, inputMap[testArgUUID])
 	})

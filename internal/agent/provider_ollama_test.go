@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,8 +61,10 @@ func TestOllamaListModels(t *testing.T) {
 	})
 
 	t.Run("unreachable server", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 		p := NewOllamaProvider("http://127.0.0.1:1")
-		_, err := p.ListModels(context.Background())
+		_, err := p.ListModels(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to reach Ollama")
 	})
