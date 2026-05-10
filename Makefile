@@ -1,4 +1,4 @@
-.PHONY: help build build-server run start check-deps setup-certs install clean test test-race test-functional
+.PHONY: help build build-server run start check-deps setup-certs install clean test test-race test-e2e
 
 help:
 	@echo "Keylime MCP"
@@ -15,9 +15,9 @@ help:
 	@echo "  make start        - Run pre-built binary (no compilation)"
 	@echo ""
 	@echo "Tests:"
-	@echo "  make test              - Run server tests"
-	@echo "  make test-race         - Run server tests with race detector"
-	@echo "  make test-functional   - Run functional tests via Testing Farm"
+	@echo "  make test              - Run unit tests"
+	@echo "  make test-race         - Run unit tests with race detector"
+	@echo "  make test-e2e     		- Submit e2e tests to Testing Farm (requires testing-farm + credentials)"
 
 .env:
 	@if [ ! -f .env ]; then \
@@ -72,12 +72,12 @@ clean:
 # Tests
 
 test:
-	go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -count=1
+	go test ./internal/... ./cmd/... -count=1
 
 test-race:
-	go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -race -count=1
+	go test ./internal/... ./cmd/... -race -count=1
 
-test-functional:
+test-e2e:
 	testing-farm request \
 		--compose Fedora-Rawhide \
 		--plan 'e2e/plans/keylime-mcp-main' \

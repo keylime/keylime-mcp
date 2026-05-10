@@ -24,6 +24,12 @@ const (
 When users request information or actions, call the appropriate tool directly. You can call tools in sequence to complete multi-step tasks. After receiving tool results, summarize them for the user. If a tool returns an error, explain the issue and suggest a resolution.`
 )
 
+type mcpSession interface {
+	ListTools(ctx context.Context, params *mcp.ListToolsParams) (*mcp.ListToolsResult, error)
+	CallTool(ctx context.Context, params *mcp.CallToolParams) (*mcp.CallToolResult, error)
+	Close() error
+}
+
 type Config struct {
 	ServerPath   string
 	Model        string
@@ -35,7 +41,7 @@ type Agent struct {
 	config     Config
 	provider   LLMProvider
 	masker     *masking.Engine
-	mcpSession *mcp.ClientSession
+	mcpSession mcpSession
 	mcpCmd     *exec.Cmd
 	tools      []*mcp.Tool
 
