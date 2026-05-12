@@ -62,6 +62,32 @@ Access at http://localhost:3000
 - `make start` - Run pre-built binary (no compilation)
 
 
+## Testing
+
+### Unit tests
+
+```bash
+make test          # run unit tests
+make test-race     # run with race detector
+```
+
+### E2E tests (Testing Farm)
+
+E2E tests run on [Testing Farm](https://docs.testing-farm.io/) against a real Keylime deployment with emulated TPM. They are triggered automatically on pull requests via [Packit](https://packit.dev/).
+
+To run manually:
+
+```bash
+make test-e2e
+```
+
+This requires a Testing Farm API token and Red Hat VPN access.
+
+TMT plans are in `e2e/plans/`. Available plans:
+- `keylime-mcp-server` — MCP server tests only
+- `keylime-mcp-client` — web client tests only
+- `keylime-mcp-main` — all tests (server + client)
+
 ## About Keylime
 
 [Keylime](https://keylime.dev) is an open-source remote attestation framework that provides:
