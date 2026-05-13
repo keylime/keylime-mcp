@@ -32,7 +32,7 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
 }
 ```
 
-Replace paths with your actual locations. Certs are typically in `/var/lib/keylime/cv_ca` (need read permissions -- run `make setup-certs`).
+Replace paths with your actual locations. Certs are typically in `/var/lib/keylime/cv_ca` (need read permissions — run `make setup-certs`).
 
 ### Option 2: Web UI
 
@@ -70,9 +70,10 @@ Control over the project is managed by a Makefile. Since this project works as a
 | `make build` | Compiles the whole project (client and server) |
 | `make run` | Compiles and runs the whole project |
 | `make start` | Runs the project without compiling (uses pre-built binaries) |
-| `make setup-certs` | Keylime certificates in `/var/lib/keylime/cv_ca` require superuser privileges. Grants read permissions to the current user using `setfacl` |
+| `make setup-certs` | Grants read access to Keylime certificates and persists across reboots via a systemd service |
+| `make setup-certs-session` | Same but only for the current session (does not survive reboot) |
 | `make check-deps` | Checks all dependencies for running the project |
-| `make clean` | Removes the compiled binaries |
+| `make clean` | Removes compiled binaries and the systemd service created by `setup-certs` |
 | `make test` | Runs unit tests |
 | `make test-race` | Runs unit tests with the `-race` flag (detects data races) |
 | `make test-e2e` | Submits end-to-end tests to Testing Farm. Requires Red Hat VPN access |

@@ -18,7 +18,7 @@ Tools exposed by the Keylime MCP server. Each tool maps to Keylime REST API oper
 | `Get_agent_details` | Get hardware identity (EK, AIK, certs, IP) from the Registrar |
 | `Get_agent_policies` | Get assigned TPM/vTPM policies and accepted algorithms |
 | `Get_failed_agents` | List agents in a failed attestation state with failure details |
-| `Get_verifier_logs` | Read Verifier journalctl logs, filterable by agent and failure type |
+| `Get_verifier_logs` | Read Verifier journalctl logs, filterable by agent and failure type (designed only when the MCP server runs on the same system as verifier) |
 | `Enroll_agent_to_verifier` | Enroll a registered agent for active attestation with optional policies |
 | `Update_agent` | Re-enroll an agent with new policies (safe unenroll + re-enroll) |
 | `Unenroll_agent_from_verifier` | Remove an agent from the Verifier (keeps Registrar record) |
