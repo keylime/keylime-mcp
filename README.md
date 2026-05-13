@@ -52,6 +52,7 @@ Copy `.env.example` to `.env` and adjust:
 | `KEYLIME_API_VERSION` | `v2.5` | Keylime REST API version |
 | `KEYLIME_CERT_DIR` | `/var/lib/keylime/cv_ca` | mTLS certificate directory |
 | `KEYLIME_TLS_ENABLED` | `true` | Enable mTLS for Keylime communication |
+| `KEYLIME_TLS_SERVER_NAME` | `localhost` | Expected server name in Keylime certificate SAN |
 | `ANTHROPIC_API_KEY` | -- | Required for Claude provider |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint (for local LLM) |
 | `OLLAMA_MODEL` | -- | Ollama model name (e.g., `qwen2.5`) |
