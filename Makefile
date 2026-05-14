@@ -1,12 +1,13 @@
-.PHONY: help build build-server run start check-deps setup-certs install clean test test-race test-e2e
+.PHONY: help build build-server run start check-deps setup-certs setup-certs-session install clean test test-race test-e2e
 
 help:
 	@echo "Keylime MCP"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install      - Full setup (check deps, env, certs, build)"
-	@echo "  make check-deps   - Verify Go is installed and certs are readable"
-	@echo "  make setup-certs  - Grant read access to Keylime certs (requires sudo)"
+	@echo "  make check-deps   - Verify dependencies (Go, setfacl, systemctl, sudo, certs)"
+	@echo "  make setup-certs          - Grant read access to Keylime certs, persists across reboots (requires sudo)"
+	@echo "  make setup-certs-session  - Same but only for current session (does not survive reboot)"
 	@echo ""
 	@echo "Build & Run:"
 	@echo "  make build-server - Build MCP server binary"
@@ -39,20 +40,45 @@ start:
 
 KEYLIME_CERT_DIR := /var/lib/keylime/cv_ca
 CERT_FILES := cacert.crt client-cert.crt client-private.pem
+EFFECTIVE_USER := $(or $(SUDO_USER),$(USER))
 
-setup-certs:
-	@echo "Granting read access to Keylime certificates for user '$(USER)'..."
-	@sudo setfacl -m u:$(USER):rx /var/lib/keylime
-	@sudo setfacl -m u:$(USER):rx $(KEYLIME_CERT_DIR)
+SYSTEMD_SERVICE := /etc/systemd/system/keylime-mcp-certs.service
+
+setup-certs: setup-certs-session
+	@echo "Persisting certificate access across reboots..."
+	@printf '%s\n' \
+		"[Unit]" \
+		"Description=Grant certificate access for Keylime MCP" \
+		"After=systemd-tmpfiles-setup.service" \
+		"[Service]" \
+		"Type=oneshot" \
+		$(foreach f,$(CERT_FILES),"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):r $(KEYLIME_CERT_DIR)/$(f)") \
+		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx /var/lib/keylime" \
+		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx $(KEYLIME_CERT_DIR)" \
+		"[Install]" \
+		"WantedBy=multi-user.target" \
+		| sudo tee $(SYSTEMD_SERVICE) > /dev/null
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable keylime-mcp-certs.service
+	@echo "Done. Certificate access granted and will persist across reboots."
+
+setup-certs-session:
+	@echo "Granting read access to Keylime certificates for user '$(EFFECTIVE_USER)' (session only)..."
+	@sudo setfacl -m u:$(EFFECTIVE_USER):rx /var/lib/keylime
+	@sudo setfacl -m u:$(EFFECTIVE_USER):rx $(KEYLIME_CERT_DIR)
 	@for f in $(CERT_FILES); do \
-		sudo setfacl -m u:$(USER):r "$(KEYLIME_CERT_DIR)/$$f"; \
+		sudo setfacl -m u:$(EFFECTIVE_USER):r "$(KEYLIME_CERT_DIR)/$$f"; \
 	done
-	@echo "Done. Certificate access granted."
+	@echo "Done. Certificate access granted (will not persist across reboots)."
 
 check-deps:
 	@echo "Checking dependencies..."
 	@command -v go >/dev/null 2>&1 || { echo "Go not found. Install: https://go.dev/dl/"; exit 1; }
 	@echo "  Go: $$(go version)"
+	@command -v setfacl >/dev/null 2>&1 || { echo "setfacl not found. Install: sudo dnf install acl"; exit 1; }
+	@command -v systemctl >/dev/null 2>&1 || { echo "systemctl not found. systemd is required."; exit 1; }
+	@command -v sudo >/dev/null 2>&1 || { echo "sudo not found. Install: sudo dnf install sudo"; exit 1; }
+	@echo "  Tools: OK (setfacl, systemctl, sudo)"
 	@for f in $(CERT_FILES); do \
 		if [ ! -r "$(KEYLIME_CERT_DIR)/$$f" ]; then \
 			echo "  Certificate not readable: $(KEYLIME_CERT_DIR)/$$f"; \
@@ -68,6 +94,12 @@ install: setup-certs check-deps .env build
 
 clean:
 	rm -rf bin/*
+	@if [ -f $(SYSTEMD_SERVICE) ]; then \
+		sudo systemctl disable keylime-mcp-certs.service 2>/dev/null; \
+		sudo rm -f $(SYSTEMD_SERVICE); \
+		sudo systemctl daemon-reload; \
+		echo "Removed keylime-mcp-certs.service"; \
+	fi
 
 # Tests
 
