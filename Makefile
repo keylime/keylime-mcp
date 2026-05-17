@@ -90,7 +90,7 @@ check-deps:
 	@echo "  Certs: OK"
 	@echo "All dependencies satisfied."
 
-install: check-deps setup-certs .env build
+install: setup-certs check-deps .env build
 	@echo "Installation complete. Run 'make run' or 'make start'."
 
 clean:
