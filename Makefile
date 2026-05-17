@@ -45,16 +45,17 @@ EFFECTIVE_USER := $(or $(SUDO_USER),$(USER))
 SYSTEMD_SERVICE := /etc/systemd/system/keylime-mcp-certs.service
 
 setup-certs: setup-certs-session
-	@echo "Persisting certificate access across reboots..."
+	@echo "Installing systemd service for reboot persistence..."
 	@printf '%s\n' \
 		"[Unit]" \
 		"Description=Grant certificate access for Keylime MCP" \
 		"After=systemd-tmpfiles-setup.service" \
 		"[Service]" \
 		"Type=oneshot" \
-		$(foreach f,$(CERT_FILES),"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):r $(KEYLIME_CERT_DIR)/$(f)") \
+		"RemainAfterExit=yes" \
 		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx /var/lib/keylime" \
 		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx $(KEYLIME_CERT_DIR)" \
+		$(foreach f,$(CERT_FILES),"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):r $(KEYLIME_CERT_DIR)/$(f)") \
 		"[Install]" \
 		"WantedBy=multi-user.target" \
 		| sudo tee $(SYSTEMD_SERVICE) > /dev/null
@@ -63,7 +64,7 @@ setup-certs: setup-certs-session
 	@echo "Done. Certificate access granted and will persist across reboots."
 
 setup-certs-session:
-	@echo "Granting read access to Keylime certificates for user '$(EFFECTIVE_USER)' (session only)..."
+	@echo "Granting read access to Keylime certificates for user '$(EFFECTIVE_USER)'..."
 	@sudo setfacl -m u:$(EFFECTIVE_USER):rx /var/lib/keylime
 	@sudo setfacl -m u:$(EFFECTIVE_USER):rx $(KEYLIME_CERT_DIR)
 	@for f in $(CERT_FILES); do \
@@ -89,7 +90,7 @@ check-deps:
 	@echo "  Certs: OK"
 	@echo "All dependencies satisfied."
 
-install: setup-certs check-deps .env build
+install: check-deps setup-certs .env build
 	@echo "Installation complete. Run 'make run' or 'make start'."
 
 clean:
