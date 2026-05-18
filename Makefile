@@ -41,24 +41,31 @@ start:
 KEYLIME_CERT_DIR := /var/lib/keylime/cv_ca
 CERT_FILES := cacert.crt client-cert.crt client-private.pem
 EFFECTIVE_USER := $(or $(SUDO_USER),$(USER))
+EFFECTIVE_UID := $(shell id -u $(EFFECTIVE_USER))
 
 SYSTEMD_SERVICE := /etc/systemd/system/keylime-mcp-certs.service
+TMPFILES_CONF := /etc/tmpfiles.d/keylime-mcp.conf
 
 setup-certs: setup-certs-session
 	@echo "Installing systemd service for reboot persistence..."
 	@printf '%s\n' \
 		"[Unit]" \
 		"Description=Grant certificate access for Keylime MCP" \
-		"After=systemd-tmpfiles-setup.service" \
+		"After=systemd-tmpfiles-setup.service nss-user-lookup.target" \
 		"[Service]" \
 		"Type=oneshot" \
 		"RemainAfterExit=yes" \
-		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx /var/lib/keylime" \
-		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):rx $(KEYLIME_CERT_DIR)" \
-		$(foreach f,$(CERT_FILES),"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_USER):r $(KEYLIME_CERT_DIR)/$(f)") \
+		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_UID):rx /var/lib/keylime" \
+		"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_UID):rx $(KEYLIME_CERT_DIR)" \
+		$(foreach f,$(CERT_FILES),"ExecStart=/usr/bin/setfacl -m u:$(EFFECTIVE_UID):r $(KEYLIME_CERT_DIR)/$(f)") \
 		"[Install]" \
 		"WantedBy=multi-user.target" \
 		| sudo tee $(SYSTEMD_SERVICE) > /dev/null
+	@printf '%s\n' \
+		"a+ /var/lib/keylime - - - - u:$(EFFECTIVE_UID):rx" \
+		"a+ $(KEYLIME_CERT_DIR) - - - - u:$(EFFECTIVE_UID):rx" \
+		$(foreach f,$(CERT_FILES),"a+ $(KEYLIME_CERT_DIR)/$(f) - - - - u:$(EFFECTIVE_UID):r") \
+		| sudo tee $(TMPFILES_CONF) > /dev/null
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable keylime-mcp-certs.service
 	@echo "Done. Certificate access granted and will persist across reboots."
@@ -100,6 +107,10 @@ clean:
 		sudo rm -f $(SYSTEMD_SERVICE); \
 		sudo systemctl daemon-reload; \
 		echo "Removed keylime-mcp-certs.service"; \
+	fi
+	@if [ -f $(TMPFILES_CONF) ]; then \
+		sudo rm -f $(TMPFILES_CONF); \
+		echo "Removed $(TMPFILES_CONF)"; \
 	fi
 
 # Tests
