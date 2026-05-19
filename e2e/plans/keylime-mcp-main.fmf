@@ -9,7 +9,7 @@ discover:
   - name: keylime-setup
     how: fmf
     url: https://github.com/RedHat-SP-Security/keylime-tests.git
-    ref: main
+    ref: "@.tmt/dynamic_ref.fmf"
     test:
       - /setup/apply_workarounds
       - /setup/configure_tpm_emulator

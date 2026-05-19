@@ -10,7 +10,7 @@ framework: beakerlib
 require:
   - type: library
     url: https://github.com/RedHat-SP-Security/keylime-tests
-    ref: main
+    ref: "@.tmt/dynamic_ref.fmf"
     name: /Library/test-helpers
 recommend:
   - keylime
