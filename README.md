@@ -1,6 +1,6 @@
 # Keylime MCP
 
-MCP server for [Keylime](https://keylime.dev) remote attestation.
+MCP server and privacy-focused web client for [Keylime](https://keylime.dev) remote attestation.
 
 ## Requirements
 
@@ -18,7 +18,12 @@ Build the server:
 make build-server
 ```
 
-Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.json`):
+**Claude Code:**
+```bash
+claude mcp add keylime --scope user /full/path/to/keylime-mcp/bin/server
+```
+
+**Claude Desktop** and other config-file based MCP clients (`~/.config/Claude/claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
@@ -32,7 +37,7 @@ Add to your MCP client config (e.g., `~/.config/Claude/claude_desktop_config.jso
 }
 ```
 
-Replace paths with your actual locations. Certs are typically in `/var/lib/keylime/cv_ca` (need read permissions — run `make setup-certs`).
+The `env` block is optional — the server defaults to `/var/lib/keylime/cv_ca`. Certs need read permissions (run `make setup-certs`).
 
 ### Option 2: Web UI
 
