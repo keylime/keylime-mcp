@@ -14,6 +14,8 @@ graph TD
     WebServer --> Agent[AI Agent]
     Agent -->|stdio JSON-RPC| MCP[MCP Server]
     Agent -->|HTTPS| Claude[Anthropic Claude]
+    Agent -->|HTTPS| OpenAI[OpenAI]
+    Agent -->|HTTPS| OpenRouter[OpenRouter]
     Agent -->|HTTP| Ollama[Ollama]
     MCP -->|mTLS REST| Verifier[Keylime Verifier]
     MCP -->|mTLS REST| Registrar[Keylime Registrar]
@@ -28,7 +30,7 @@ cmd/
 internal/
   keylime/         Keylime API client, mTLS config, request/response types
   mcptools/        MCP tool definitions, input validation, response mapping
-  agent/           LLM provider abstraction (Anthropic, Ollama)
+  agent/           LLM provider abstraction (Anthropic, Ollama, OpenAI, OpenRouter)
   masking/         Data sanitization — masks sensitive fields before sending to LLMs
   web/             HTTP server, SSE streaming, HTML templates
 e2e/               Testing Farm plans and test scripts
@@ -41,3 +43,5 @@ e2e/               Testing Farm plans and test scripts
 **Safe operations.** Destructive actions like re-enrollment validate preconditions first. `Update_agent` checks that the agent exists in the Registrar and that requested policies are available on the Verifier before unenrolling, preventing the agent from being left unprotected if re-enrollment fails.
 
 **Provider abstraction.** The agent package defines a generic provider interface. Switching between Anthropic Claude (cloud) and Ollama (local) requires only changing an environment variable, not code. New providers can be added by implementing the interface.
+
+**OpenAI-compatible providers.** OpenAI and OpenRouter share one Chat Completions adapter. Each constructor supplies its own API URL, API key, and provider name. The adapter translates messages, MCP tool schemas, tool calls, and tool results to the shared API format; the agent loop and web model-selection logic are unchanged.

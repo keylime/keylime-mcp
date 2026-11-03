@@ -59,6 +59,8 @@ Copy `.env.example` to `.env` and adjust:
 | `KEYLIME_TLS_ENABLED` | `true` | Enable mTLS for Keylime communication |
 | `KEYLIME_TLS_SERVER_NAME` | `localhost` | Expected server name in Keylime certificate SAN |
 | `ANTHROPIC_API_KEY` | -- | Required for Claude provider |
+| `OPENAI_API_KEY` | -- | Enables OpenAI via its Chat Completions API |
+| `OPENROUTER_API_KEY` | -- | Enables OpenRouter via its OpenAI-compatible API |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint (for local LLM) |
 | `OLLAMA_MODEL` | -- | Ollama model name (e.g., `qwen2.5`) |
 | `MASKING_ENABLED` | `true` | Mask sensitive data before sending to LLM |
