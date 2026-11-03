@@ -149,6 +149,7 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 		Role:      RoleAssistant,
 		Text:      strings.Join(response.TextBlocks, "\n"),
 		ToolCalls: response.ToolUses,
+		reasoning: response.reasoning,
 	}
 
 	a.mu.Lock()

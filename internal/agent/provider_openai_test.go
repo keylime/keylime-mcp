@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/keylime/keylime-mcp/internal/masking"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -161,7 +162,7 @@ func TestOpenAIChatErrors(t *testing.T) {
 		{"API failure", http.StatusUnauthorized, `{"error":{"message":"Invalid API key","type":"authentication_error"}}`, "Invalid API key"},
 		{"malformed response", http.StatusOK, `{`, ""},
 		{"empty choices", http.StatusOK, `{"choices":[]}`, "no choices"},
-		{"malformed tool arguments", http.StatusOK, `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"bad-call","type":"function","function":{"name":"Get_agent_status","arguments":"{"}}]}}]}`, "bad-call"},
+		{"malformed tool arguments", http.StatusOK, `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"bad-call","type":"function","function":{"name":"Get_agent_status","arguments":"{"}}]}}]}`, "bad-call"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewOpenAIProvider("test-key")
@@ -204,7 +205,7 @@ func TestOpenRouterPreservesReasoningDuringToolExecution(t *testing.T) {
 	stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
 		calls++
 		if calls == 1 {
-			return http.StatusOK, `{"choices":[{"message":{"role":"assistant","content":null,"reasoning_details":` + details + `,"tool_calls":[{"id":"call-signed","type":"function","function":{"name":"Get_agent_status","arguments":"{\"agent_uuid\":\"` + maskedUUID + `\"}"}}]}}]}`
+			return http.StatusOK, `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"reasoning_details":` + details + `,"tool_calls":[{"id":"call-signed","type":"function","function":{"name":"Get_agent_status","arguments":"{\"agent_uuid\":\"` + maskedUUID + `\"}"}}]}}]}`
 		}
 		var body struct {
 			Messages []struct {
@@ -216,7 +217,7 @@ func TestOpenRouterPreservesReasoningDuringToolExecution(t *testing.T) {
 		require.Len(t, body.Messages, 4)
 		assert.Equal(t, "assistant", body.Messages[2].Role)
 		assert.JSONEq(t, details, string(body.Messages[2].ReasoningDetails))
-		return http.StatusOK, `{"choices":[{"message":{"role":"assistant","content":"Agent is healthy"}}]}`
+		return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Agent is healthy"}}]}`
 	})
 	// Exercise the unchanged agent loop, including argument unmasking and MCP execution.
 	a := NewAgent(Config{Model: "vendor/reasoning-model"}, p, masker)
@@ -241,4 +242,223 @@ func TestOpenRouterPreservesReasoningDuringToolExecution(t *testing.T) {
 	assert.JSONEq(t, `{"agent_uuid":"`+testUUID+`"}`, string(args))
 	assert.Equal(t, []string{"Agent is healthy"}, texts)
 	assert.Equal(t, 2, calls)
+}
+
+func TestOpenAIRejectsUnusableCompletions(t *testing.T) {
+	for _, factory := range []struct {
+		name string
+		new  func(string) *OpenAIProvider
+	}{{"openai", NewOpenAIProvider}, {"openrouter", NewOpenRouterProvider}} {
+		t.Run(factory.name, func(t *testing.T) {
+			for _, tt := range []struct {
+				name string
+				body string
+				want string
+			}{
+				{"null response", `null`, "no choices"},
+				{"empty stop", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":""}}]}`, "no text or tool calls"},
+				{"whitespace", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":" \n\t"}}]}`, "no text or tool calls"},
+				{"reasoning exhausted budget", `{"id":"gen-budget","choices":[{"finish_reason":"length","message":{"role":"assistant","content":null,"reasoning":"Still thinking"}}],"usage":{"completion_tokens":2048,"completion_tokens_details":{"reasoning_tokens":2048}}}`, "token limit"},
+				{"truncated text", `{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"partial answer"}}]}`, "token limit"},
+				{"truncated tool call with valid JSON", `{"choices":[{"finish_reason":"length","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"Delete_agent","arguments":"{}"}}]}}]}`, "token limit"},
+				{"content filtered", `{"choices":[{"finish_reason":"content_filter","message":{"role":"assistant","content":"partial"}}]}`, "content filter"},
+				{"upstream failure", `{"error":{"code":503,"message":"Provider unavailable"}}`, "Provider unavailable"},
+				{"upstream failure with partial text", `{"choices":[{"finish_reason":"error","message":{"role":"assistant","content":"partial"},"error":{"code":502,"message":"Provider disconnected"}}]}`, "Provider disconnected"},
+				{"error overrides usable content", `{"error":{"message":"Generation failed"},"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"partial"}}]}`, "Generation failed"},
+				{"unsupported finish reason", `{"choices":[{"finish_reason":"function_call","message":{"role":"assistant","content":"partial"}}]}`, "finish reason"},
+				{"missing calls", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"Checking"}}]}`, "without tool calls"},
+				{"missing tool id", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"type":"function","function":{"name":"List_agents","arguments":"{}"}}]}}]}`, "tool call"},
+				{"missing tool name", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"arguments":"{}"}}]}}]}`, "tool call"},
+				{"unsupported tool type", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"custom","custom":{"name":"List_agents","input":"{}"}}]}}]}`, "tool call"},
+				{"array arguments", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"List_agents","arguments":"[]"}}]}}]}`, "arguments"},
+				{"null arguments", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"List_agents","arguments":"null"}}]}}]}`, "arguments"},
+				{"duplicate ids", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"List_agents","arguments":"{}"}},{"id":"c1","type":"function","function":{"name":"Delete_agent","arguments":"{}"}}]}}]}`, "duplicate"},
+				{"object content coerced by SDK", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":{"unexpected":"object"}}}]}`, "invalid response"},
+				{"malformed calls hidden by SDK", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"partial","tool_calls":{"unexpected":"object"}}}]}`, "invalid response"},
+				{"object arguments coerced by SDK", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"Delete_agent","arguments":{}}}]}}]}`, "invalid response"},
+				{"numeric tool ID coerced by SDK", `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":123,"type":"function","function":{"name":"Delete_agent","arguments":"{}"}}]}}]}`, "invalid response"},
+				{"explicit unfinished reason", `{"choices":[{"finish_reason":null,"message":{"role":"assistant","content":"partial"}}]}`, "finish reason"},
+				{"explicit empty reason", `{"choices":[{"finish_reason":"","message":{"role":"assistant","content":"partial"}}]}`, "finish reason"},
+				{"missing finish reason", `{"choices":[{"message":{"role":"assistant","content":"partial"}}]}`, "finish reason"},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					p := factory.new("test-key")
+					stubOpenAIHTTP(p, func(*http.Request) (int, string) { return http.StatusOK, tt.body })
+					resp, err := p.Chat(context.Background(), ChatOptions{Model: "chat-model", MaxTokens: 2048, Messages: []Message{{Role: RoleUser, Text: "check"}}})
+					require.Error(t, err)
+					assert.Nil(t, resp, "failed or incomplete responses must never expose executable tools")
+					assert.Contains(t, err.Error(), tt.want)
+				})
+			}
+		})
+	}
+}
+
+func TestOpenAIRejectsInvalidModelListings(t *testing.T) {
+	for _, tt := range []struct{ body, want string }{
+		{`null`, "model list"},
+		{`{"error":{"code":503,"message":"Discovery unavailable"}}`, "Discovery unavailable"},
+		{`{"data":[{"id":""}]}`, "model ID"},
+		{`{"data":"invalid"}`, "model list"},
+		{`{"data":[{"id":123}]}`, "model list"},
+	} {
+		t.Run(tt.body, func(t *testing.T) {
+			p := NewOpenRouterProvider("test-key")
+			stubOpenAIHTTP(p, func(*http.Request) (int, string) { return http.StatusOK, tt.body })
+			models, err := p.ListModels(context.Background())
+			require.Error(t, err)
+			assert.Nil(t, models)
+			assert.Contains(t, err.Error(), tt.want)
+		})
+	}
+}
+
+func TestOpenAIRequestDeadlines(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		limit time.Duration
+		call  func(context.Context, *OpenAIProvider) error
+	}{
+		{"chat", 2 * time.Minute, func(ctx context.Context, p *OpenAIProvider) error {
+			_, err := p.Chat(ctx, ChatOptions{Model: "chat-model", Messages: []Message{{Role: RoleUser, Text: "hi"}}})
+			return err
+		}},
+		{"models", 5 * time.Second, func(ctx context.Context, p *OpenAIProvider) error {
+			_, err := p.ListModels(ctx)
+			return err
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewOpenAIProvider("test-key")
+			requests := 0
+			stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
+				requests++
+				deadline, ok := r.Context().Deadline()
+				assert.True(t, ok, "requests without a caller deadline must still be bounded")
+				if ok {
+					assert.Positive(t, time.Until(deadline))
+					assert.LessOrEqual(t, time.Until(deadline), tt.limit)
+				}
+				return http.StatusOK, `{"data":[],"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"done"}}]}`
+			})
+			require.NoError(t, tt.call(context.Background(), p))
+			assert.Equal(t, 1, requests)
+		})
+	}
+}
+
+func TestOpenRouterDoesNotForwardOpenAIAccountHeaders(t *testing.T) {
+	t.Setenv("OPENAI_ORG_ID", "private-org")
+	t.Setenv("OPENAI_PROJECT_ID", "private-project")
+	for _, factory := range []struct {
+		name string
+		new  func(string) *OpenAIProvider
+	}{{"openai", NewOpenAIProvider}, {"openrouter", NewOpenRouterProvider}} {
+		t.Run(factory.name, func(t *testing.T) {
+			p := factory.new("test-key")
+			stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
+				if factory.name == "openrouter" {
+					assert.Empty(t, r.Header.Get("OpenAI-Organization"))
+					assert.Empty(t, r.Header.Get("OpenAI-Project"))
+				} else {
+					assert.Equal(t, "private-org", r.Header.Get("OpenAI-Organization"))
+					assert.Equal(t, "private-project", r.Header.Get("OpenAI-Project"))
+				}
+				return http.StatusOK, `{"data":[]}`
+			})
+			_, err := p.ListModels(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestOpenRouterPreservesTextOnlyReasoning(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		new        func(string) *OpenAIProvider
+		model      string
+		wantReplay bool
+		details    string
+	}{
+		{"same model with empty details", NewOpenRouterProvider, "source-model", true, `[]`},
+		{"same model with signed details", NewOpenRouterProvider, "source-model", true, `[{"type":"reasoning.encrypted","data":"opaque-signature","index":0}]`},
+		{"different model", NewOpenRouterProvider, "other-model", false, `[]`},
+		{"different provider", NewOpenAIProvider, "source-model", false, `[]`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewOpenRouterProvider("test-key")
+			stubOpenAIHTTP(p, func(*http.Request) (int, string) {
+				return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Ready","reasoning_details":` + tt.details + `,"reasoning":"opaque reasoning","reasoning_content":"opaque alternate reasoning"}}]}`
+			})
+			a := NewAgent(Config{Model: "source-model"}, p, nil)
+			require.NoError(t, a.SendMessage(context.Background(), "hello", func(Message) {}))
+			next := tt.new("next-key")
+			stubOpenAIHTTP(next, func(r *http.Request) (int, string) {
+				var body struct {
+					Messages []map[string]json.RawMessage `json:"messages"`
+				}
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				require.Len(t, body.Messages, 4)
+				previous := body.Messages[2]
+				if tt.wantReplay {
+					assert.JSONEq(t, tt.details, string(previous["reasoning_details"]))
+					assert.JSONEq(t, `"opaque reasoning"`, string(previous["reasoning"]))
+					assert.JSONEq(t, `"opaque alternate reasoning"`, string(previous["reasoning_content"]))
+				} else {
+					assert.NotContains(t, previous, "reasoning_details")
+					assert.NotContains(t, previous, "reasoning")
+					assert.NotContains(t, previous, "reasoning_content")
+				}
+				return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Done"}}]}`
+			})
+			a.SetModel(next, tt.model)
+			require.NoError(t, a.SendMessage(context.Background(), "continue", func(Message) {}))
+		})
+	}
+}
+
+func TestOpenAIRefusalIsVisible(t *testing.T) {
+	p := NewOpenAIProvider("test-key")
+	stubOpenAIHTTP(p, func(*http.Request) (int, string) {
+		return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":null,"refusal":"I cannot complete this request"}}]}`
+	})
+	response, err := p.Chat(context.Background(), ChatOptions{Model: "chat-model", Messages: []Message{{Role: RoleUser, Text: "hello"}}})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"I cannot complete this request"}, response.TextBlocks)
+	assert.Empty(t, response.ToolUses)
+}
+
+func TestOpenAIHonorsDeadlineDuringRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		call func(context.Context, *OpenAIProvider) error
+	}{
+		{"chat", func(ctx context.Context, p *OpenAIProvider) error {
+			_, err := p.Chat(ctx, ChatOptions{Model: "chat-model", Messages: []Message{{Role: RoleUser, Text: "hello"}}})
+			return err
+		}},
+		{"models", func(ctx context.Context, p *OpenAIProvider) error {
+			_, err := p.ListModels(ctx)
+			return err
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewOpenAIProvider("test-key")
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			requests := 0
+			opts := append([]option.RequestOption{}, p.client.Options...)
+			p.client = openai.NewClient(append(opts, option.WithHTTPClient(&http.Client{Transport: openAITransportFunc(func(r *http.Request) (*http.Response, error) {
+				requests++
+				deadline, ok := r.Context().Deadline()
+				require.True(t, ok)
+				parentDeadline, _ := ctx.Deadline()
+				assert.Equal(t, parentDeadline, deadline)
+				<-r.Context().Done()
+				return nil, r.Context().Err()
+			})}))...)
+			assert.ErrorIs(t, tt.call(ctx, p), context.DeadlineExceeded)
+			assert.Equal(t, 1, requests, "expired operations must not be retried")
+		})
+	}
 }

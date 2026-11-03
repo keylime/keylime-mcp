@@ -784,6 +784,7 @@
             });
 
             eventSource.addEventListener('error', (e) => {
+                if (typeof e.data !== 'string') return;
                 hideLoading();
                 appendHTML(e.data);
                 scrollToBottom();
@@ -798,7 +799,8 @@
                 setStatus('connected', 'Connected');
             });
 
-            eventSource.onerror = () => {
+            eventSource.onerror = (e) => {
+                if (typeof e.data === 'string') return;
                 setStatus('disconnected', 'Disconnected');
                 setTimeout(connect, 3000);
             };

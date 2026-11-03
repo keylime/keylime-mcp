@@ -13,6 +13,7 @@ type Message struct {
 	Text       string
 	ToolCalls  []ToolRequest
 	ToolResult *ToolResult
+	reasoning  *reasoningData
 }
 
 type ToolRequest struct {
