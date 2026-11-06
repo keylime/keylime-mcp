@@ -120,6 +120,9 @@ func (a *Agent) callLLM(ctx context.Context, onMessage func(Message)) error {
 
 	if a.masker != nil {
 		for i := range messagesCopy {
+			if messagesCopy[i].Role == RoleUser {
+				messagesCopy[i].Text = a.masker.Mask(messagesCopy[i].Text)
+			}
 			if messagesCopy[i].ToolResult != nil {
 				messagesCopy[i].ToolResult = &ToolResult{
 					ToolID:  messagesCopy[i].ToolResult.ToolID,

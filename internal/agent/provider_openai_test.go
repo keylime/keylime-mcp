@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -47,7 +48,7 @@ func TestOpenAIListModels(t *testing.T) {
 		new  func(string) *OpenAIProvider
 	}{
 		{"openai", "https://api.openai.com/v1/models", NewOpenAIProvider},
-		{"openrouter", "https://openrouter.ai/api/v1/models", NewOpenRouterProvider},
+		{"openrouter", "https://openrouter.ai/api/v1/models?supported_parameters=tools", NewOpenRouterProvider},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// OpenAI environment defaults must not redirect OpenRouter or replace its key.
@@ -58,7 +59,7 @@ func TestOpenAIListModels(t *testing.T) {
 				assert.Equal(t, http.MethodGet, r.Method)
 				assert.Equal(t, tt.url, r.URL.String())
 				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
-				return http.StatusOK, `{"object":"list","data":[{"id":"vendor/model-b","object":"model","created":1,"owned_by":"vendor"},{"id":"model-a","object":"model","created":2,"owned_by":"vendor"}]}`
+				return http.StatusOK, `{"object":"list","data":[{"id":"gpt-4o","object":"model","created":1,"owned_by":"vendor"},{"id":"gpt-4.1","object":"model","created":2,"owned_by":"vendor"}]}`
 			})
 
 			models, err := p.ListModels(context.Background())
@@ -66,10 +67,90 @@ func TestOpenAIListModels(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.name, p.Name())
 			assert.Equal(t, []ModelInfo{
-				{ID: "vendor/model-b", DisplayName: "vendor/model-b", Provider: tt.name},
-				{ID: "model-a", DisplayName: "model-a", Provider: tt.name},
+				{ID: "gpt-4o", DisplayName: "gpt-4o", Provider: tt.name},
+				{ID: "gpt-4.1", DisplayName: "gpt-4.1", Provider: tt.name},
 			}, models)
 		})
+	}
+}
+
+func TestOpenAIListModelsFiltersUnsupportedModels(t *testing.T) {
+	p := NewOpenAIProvider("test-key")
+	stubOpenAIHTTP(p, func(*http.Request) (int, string) {
+		return http.StatusOK, `{"data":[{"id":"text-embedding-3-small"},{"id":"whisper-1"},{"id":"gpt-image-1"},{"id":"gpt-4o-realtime-preview"},{"id":"gpt-4o-audio-preview"},{"id":"gpt-5-pro"},{"id":"gpt-5-codex"},{"id":"gpt-4o-search-preview"},{"id":"o3-deep-research"},{"id":"chatgpt-4o-latest"},{"id":"o1-mini"},{"id":"o1-mini-2024-09-12"},{"id":"o1-preview"},{"id":"unknown-future-model"},{"id":"gpt-4o"},{"id":"gpt-4.1-mini-2025-04-14"},{"id":"gpt-5-mini"},{"id":"o4-mini"},{"id":"ft:gpt-4o-2024-08-06:org:custom:id"}]}`
+	})
+	models, err := p.ListModels(context.Background())
+	require.NoError(t, err)
+	ids := make([]string, 0, len(models))
+	for _, model := range models {
+		ids = append(ids, model.ID)
+	}
+	assert.Equal(t, []string{"gpt-4o", "gpt-4.1-mini-2025-04-14", "gpt-5-mini", "o4-mini", "ft:gpt-4o-2024-08-06:org:custom:id"}, ids)
+}
+
+func TestOpenAIInstructionRoles(t *testing.T) {
+	for _, tt := range []struct {
+		model string
+		new   func(string) *OpenAIProvider
+		role  string
+	}{
+		{"gpt-4o", NewOpenAIProvider, "system"},
+		{"ft:gpt-4o-mini-2024-07-18:org:custom:id", NewOpenAIProvider, "system"},
+		{"gpt-5-mini", NewOpenAIProvider, "developer"},
+		{"gpt-5.2", NewOpenAIProvider, "developer"},
+		{"o1-2024-12-17", NewOpenAIProvider, "developer"},
+		{"o3-mini", NewOpenAIProvider, "developer"},
+		{"o4-mini", NewOpenAIProvider, "developer"},
+		{"ft:o4-mini-2025-04-16:org:custom:id", NewOpenAIProvider, "developer"},
+		{"openai/o3", NewOpenRouterProvider, "system"},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			p := tt.new("test-key")
+			stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
+				var body struct {
+					Messages []struct{ Role, Content string }
+				}
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				require.Len(t, body.Messages, 2)
+				assert.Equal(t, tt.role, body.Messages[0].Role)
+				assert.Equal(t, "Manage Keylime", body.Messages[0].Content)
+				return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"OK"}}]}`
+			})
+			_, err := p.Chat(context.Background(), ChatOptions{Model: tt.model, SystemPrompt: "Manage Keylime", Messages: []Message{{Role: RoleUser, Text: "check"}}})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestOpenAIUserPromptsRespectMasking(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		for _, factory := range []struct {
+			name string
+			new  func(string) *OpenAIProvider
+		}{{"openai", NewOpenAIProvider}, {"openrouter", NewOpenRouterProvider}} {
+			t.Run(fmt.Sprintf("%s/masking=%t", factory.name, enabled), func(t *testing.T) {
+				p := factory.new("test-key")
+				prompt := "Check " + testUUID + " at 192.0.2.1"
+				stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
+					var body struct{ Messages []struct{ Content string } }
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					require.Len(t, body.Messages, 2)
+					if enabled {
+						assert.Equal(t, "Check AGENT-1 at HOST-1", body.Messages[1].Content)
+					} else {
+						assert.Equal(t, prompt, body.Messages[1].Content)
+					}
+					return http.StatusOK, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"OK"}}]}`
+				})
+				masker := masking.NewEngine(enabled)
+				a := NewAgent(Config{Model: "gpt-4o"}, p, masker)
+				require.NoError(t, a.SendMessage(context.Background(), prompt, func(Message) {}))
+				assert.Equal(t, prompt, a.messages[0].Text, "local history must retain the original prompt")
+				if enabled {
+					assert.Equal(t, prompt, masker.Unmask("Check AGENT-1 at HOST-1"))
+				}
+			})
+		}
 	}
 }
 

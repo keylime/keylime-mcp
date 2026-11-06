@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +16,11 @@ import (
 )
 
 const providerOpenRouter = "openrouter"
+
+// OpenAI's model list has no endpoint capability metadata. Keep discovery
+// conservative: specialized and unknown model families must not appear as chat
+// choices. Extend this pattern when adding support for a new chat model family.
+var openAIChatModel = regexp.MustCompile(`^(gpt-(4o|4\.1|5(\.[0-9]+)?)(-(mini|nano))?(-[0-9]{4}-[0-9]{2}-[0-9]{2}|-chat-latest)?|(o1|o[34](-mini)?)(-[0-9]{4}-[0-9]{2}-[0-9]{2})?)$`)
 
 // OpenAIProvider adapts OpenAI-compatible Chat Completions APIs.
 type OpenAIProvider struct {
@@ -85,7 +91,11 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var raw []byte
-	_, err := p.client.Models.List(ctx, option.WithResponseBodyInto(&raw))
+	listOptions := []option.RequestOption{option.WithResponseBodyInto(&raw)}
+	if p.name == providerOpenRouter {
+		listOptions = append(listOptions, option.WithQuery("supported_parameters", "tools"))
+	}
+	_, err := p.client.Models.List(ctx, listOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list %s models: %w", p.name, err)
 	}
@@ -106,6 +116,11 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	for _, model := range page.Data {
 		if strings.TrimSpace(model.ID) == "" {
 			return nil, fmt.Errorf("%s returned an empty model ID", p.name)
+		}
+		if p.name == "openai" {
+			if !openAIChatModel.MatchString(openAIBaseModel(model.ID)) {
+				continue
+			}
 		}
 		models = append(models, ModelInfo{
 			ID:          model.ID,
@@ -244,10 +259,25 @@ func parseOpenAIToolCalls(provider string, message openAIMessage) ([]ToolRequest
 	return result, nil
 }
 
+func openAIBaseModel(model string) string {
+	if strings.HasPrefix(model, "ft:") {
+		return strings.SplitN(model, ":", 3)[1]
+	}
+	return model
+}
+
+func (p *OpenAIProvider) instructionMessage(prompt, model string) openai.ChatCompletionMessageParamUnion {
+	model = openAIBaseModel(model)
+	if p.name == "openai" && (strings.HasPrefix(model, "o") || strings.HasPrefix(model, "gpt-5")) {
+		return openai.DeveloperMessage(prompt)
+	}
+	return openai.SystemMessage(prompt)
+}
+
 func (p *OpenAIProvider) convertMessagesToOpenAI(systemPrompt, model string, messages []Message) ([]openai.ChatCompletionMessageParamUnion, error) {
 	result := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages)+1)
 	if systemPrompt != "" {
-		result = append(result, openai.SystemMessage(systemPrompt))
+		result = append(result, p.instructionMessage(systemPrompt, model))
 	}
 	for _, message := range messages {
 		switch message.Role {
