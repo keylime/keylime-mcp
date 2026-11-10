@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ const providerOpenRouter = "openrouter"
 
 // OpenAI's model list has no endpoint capability metadata. Keep discovery
 // conservative: specialized and unknown model families must not appear as chat
-// choices. Extend this pattern when adding support for a new chat model family.
+// choices by default. OPENAI_MODEL_FILTER_REGEX can override this filter.
 var openAIChatModel = regexp.MustCompile(`^(gpt-(4o|4\.1|5(\.[0-9]+)?)(-(mini|nano))?(-[0-9]{4}-[0-9]{2}-[0-9]{2}|-chat-latest)?|(o1|o[34](-mini)?)(-[0-9]{4}-[0-9]{2}-[0-9]{2})?)$`)
 
 // OpenAIProvider adapts OpenAI-compatible Chat Completions APIs.
@@ -35,6 +36,7 @@ type reasoningData struct {
 	fields   map[string]any
 }
 
+// openAIError captures API error payloads, including errors in HTTP 200 responses.
 type openAIError struct {
 	Message string
 	Code    json.RawMessage
@@ -55,6 +57,8 @@ type openAIResponse struct {
 	}
 }
 
+// openAIMessage decodes assistant text and tool calls with strict JSON types,
+// while retaining OpenRouter reasoning fields for replay in later requests.
 type openAIMessage struct {
 	Role, Content, Refusal string
 	ToolCalls              []struct {
@@ -88,7 +92,17 @@ func newOpenAIProvider(name, apiKey, baseURL string) *OpenAIProvider {
 func (p *OpenAIProvider) Name() string { return p.name }
 
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	filter := openAIChatModel
+	if p.name == "openai" {
+		if pattern := strings.TrimSpace(os.Getenv("OPENAI_MODEL_FILTER_REGEX")); pattern != "" {
+			var err error
+			filter, err = regexp.Compile(pattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid OPENAI_MODEL_FILTER_REGEX: %w", err)
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var raw []byte
 	listOptions := []option.RequestOption{option.WithResponseBodyInto(&raw)}
@@ -118,7 +132,7 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 			return nil, fmt.Errorf("%s returned an empty model ID", p.name)
 		}
 		if p.name == "openai" {
-			if !openAIChatModel.MatchString(openAIBaseModel(model.ID)) {
+			if !filter.MatchString(openAIBaseModel(model.ID)) {
 				continue
 			}
 		}

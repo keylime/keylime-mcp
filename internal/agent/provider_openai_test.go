@@ -42,6 +42,7 @@ func stubOpenAIHTTP(p *OpenAIProvider, handler func(*http.Request) (int, string)
 }
 
 func TestOpenAIListModels(t *testing.T) {
+	t.Setenv("OPENAI_MODEL_FILTER_REGEX", "")
 	for _, tt := range []struct {
 		name string
 		url  string
@@ -75,6 +76,7 @@ func TestOpenAIListModels(t *testing.T) {
 }
 
 func TestOpenAIListModelsFiltersUnsupportedModels(t *testing.T) {
+	t.Setenv("OPENAI_MODEL_FILTER_REGEX", "")
 	p := NewOpenAIProvider("test-key")
 	stubOpenAIHTTP(p, func(*http.Request) (int, string) {
 		return http.StatusOK, `{"data":[{"id":"text-embedding-3-small"},{"id":"whisper-1"},{"id":"gpt-image-1"},{"id":"gpt-4o-realtime-preview"},{"id":"gpt-4o-audio-preview"},{"id":"gpt-5-pro"},{"id":"gpt-5-codex"},{"id":"gpt-4o-search-preview"},{"id":"o3-deep-research"},{"id":"chatgpt-4o-latest"},{"id":"o1-mini"},{"id":"o1-mini-2024-09-12"},{"id":"o1-preview"},{"id":"unknown-future-model"},{"id":"gpt-4o"},{"id":"gpt-4.1-mini-2025-04-14"},{"id":"gpt-5-mini"},{"id":"o4-mini"},{"id":"ft:gpt-4o-2024-08-06:org:custom:id"}]}`
@@ -86,6 +88,44 @@ func TestOpenAIListModelsFiltersUnsupportedModels(t *testing.T) {
 		ids = append(ids, model.ID)
 	}
 	assert.Equal(t, []string{"gpt-4o", "gpt-4.1-mini-2025-04-14", "gpt-5-mini", "o4-mini", "ft:gpt-4o-2024-08-06:org:custom:id"}, ids)
+}
+
+func TestOpenAIModelFilterOverride(t *testing.T) {
+	allIDs := []string{"gpt-4o", "gpt-4-turbo", "future-chat-family", "ft:gpt-4-turbo:org:custom:id", "text-embedding-3-small"}
+	for _, tt := range []struct {
+		name    string
+		new     func(string) *OpenAIProvider
+		filter  string
+		want    []string
+		wantErr bool
+	}{
+		{"default", NewOpenAIProvider, "", []string{"gpt-4o"}, false},
+		{"blank uses default", NewOpenAIProvider, " \t", []string{"gpt-4o"}, false},
+		{"custom chat families", NewOpenAIProvider, `^(gpt-4-turbo|future-chat-family)$`, []string{"gpt-4-turbo", "future-chat-family", "ft:gpt-4-turbo:org:custom:id"}, false},
+		{"invalid regex", NewOpenAIProvider, "[", nil, true},
+		{"openrouter ignores override", NewOpenRouterProvider, `^gpt-4o$`, allIDs, false},
+		{"openrouter ignores invalid regex", NewOpenRouterProvider, "[", allIDs, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OPENAI_MODEL_FILTER_REGEX", tt.filter)
+			p := tt.new("test-key")
+			stubOpenAIHTTP(p, func(*http.Request) (int, string) {
+				return http.StatusOK, `{"data":[{"id":"gpt-4o"},{"id":"gpt-4-turbo"},{"id":"future-chat-family"},{"id":"ft:gpt-4-turbo:org:custom:id"},{"id":"text-embedding-3-small"}]}`
+			})
+			models, err := p.ListModels(context.Background())
+			if tt.wantErr {
+				require.ErrorContains(t, err, "OPENAI_MODEL_FILTER_REGEX")
+				assert.Nil(t, models)
+				return
+			}
+			require.NoError(t, err)
+			ids := make([]string, 0, len(models))
+			for _, model := range models {
+				ids = append(ids, model.ID)
+			}
+			assert.Equal(t, tt.want, ids)
+		})
+	}
 }
 
 func TestOpenAIInstructionRoles(t *testing.T) {
@@ -404,7 +444,7 @@ func TestOpenAIRequestDeadlines(t *testing.T) {
 			_, err := p.Chat(ctx, ChatOptions{Model: "chat-model", Messages: []Message{{Role: RoleUser, Text: "hi"}}})
 			return err
 		}},
-		{"models", 5 * time.Second, func(ctx context.Context, p *OpenAIProvider) error {
+		{"models", 30 * time.Second, func(ctx context.Context, p *OpenAIProvider) error {
 			_, err := p.ListModels(ctx)
 			return err
 		}},
@@ -426,6 +466,19 @@ func TestOpenAIRequestDeadlines(t *testing.T) {
 			assert.Equal(t, 1, requests)
 		})
 	}
+}
+
+func TestOpenRouterDiscoveryHasTimeForLargeCatalog(t *testing.T) {
+	p := NewOpenRouterProvider("test-key")
+	stubOpenAIHTTP(p, func(r *http.Request) (int, string) {
+		deadline, ok := r.Context().Deadline()
+		require.True(t, ok)
+		assert.Greater(t, time.Until(deadline), 15*time.Second, "discovery must allow more than five seconds for a large catalog")
+		assert.LessOrEqual(t, time.Until(deadline), 30*time.Second)
+		return http.StatusOK, `{"data":[]}`
+	})
+	_, err := p.ListModels(context.Background())
+	require.NoError(t, err)
 }
 
 func TestOpenRouterDoesNotForwardOpenAIAccountHeaders(t *testing.T) {
