@@ -47,6 +47,9 @@ func TestParseBool(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENROUTER_API_KEY", "")
+
 	t.Run("default values", func(t *testing.T) {
 		for _, key := range []string{
 			"MCP_SERVER_PATH", "PORT", "OLLAMA_URL", "OLLAMA_MODEL",
@@ -62,6 +65,8 @@ func TestLoadConfig(t *testing.T) {
 		assert.Equal(t, "http://localhost:11434", cfg.OllamaURL)
 		assert.Equal(t, "", cfg.OllamaModel)
 		assert.Equal(t, "", cfg.AnthropicKey)
+		assert.Empty(t, cfg.OpenAIKey)
+		assert.Empty(t, cfg.OpenRouterKey)
 		assert.True(t, cfg.MaskingEnabled)
 	})
 
@@ -71,6 +76,8 @@ func TestLoadConfig(t *testing.T) {
 		t.Setenv("OLLAMA_URL", "http://custom:11434")
 		t.Setenv("OLLAMA_MODEL", "llama3")
 		t.Setenv("ANTHROPIC_API_KEY", "sk-test-key")
+		t.Setenv("OPENAI_API_KEY", "sk-openai-key")
+		t.Setenv("OPENROUTER_API_KEY", "sk-openrouter-key")
 		t.Setenv("MASKING_ENABLED", "false")
 
 		cfg := loadConfig()
@@ -80,6 +87,8 @@ func TestLoadConfig(t *testing.T) {
 		assert.Equal(t, "http://custom:11434", cfg.OllamaURL)
 		assert.Equal(t, "llama3", cfg.OllamaModel)
 		assert.Equal(t, "sk-test-key", cfg.AnthropicKey)
+		assert.Equal(t, "sk-openai-key", cfg.OpenAIKey)
+		assert.Equal(t, "sk-openrouter-key", cfg.OpenRouterKey)
 		assert.False(t, cfg.MaskingEnabled)
 	})
 
@@ -93,6 +102,14 @@ func TestLoadConfig(t *testing.T) {
 
 		cfg := loadConfig()
 		assert.Equal(t, "sk-test-key", cfg.AnthropicKey)
+	})
+
+	t.Run("new provider keys whitespace trimmed", func(t *testing.T) {
+		t.Setenv("OPENAI_API_KEY", "  sk-openai-key \n")
+		t.Setenv("OPENROUTER_API_KEY", "\t sk-openrouter-key  ")
+		cfg := loadConfig()
+		assert.Equal(t, "sk-openai-key", cfg.OpenAIKey)
+		assert.Equal(t, "sk-openrouter-key", cfg.OpenRouterKey)
 	})
 }
 
@@ -159,4 +176,56 @@ func TestCreateProviders(t *testing.T) {
 		assert.Contains(t, names, "anthropic")
 		assert.Contains(t, names, "ollama")
 	})
+}
+
+func TestCreateNewProviders(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		cfg       config
+		ollamaEnv string
+		wantNames []string
+		wantStart string
+		wantModel string
+	}{
+		{
+			name: "openai alone", cfg: config{OpenAIKey: "openai-key"},
+			wantNames: []string{"openai", "ollama"}, wantStart: "openai",
+		},
+		{
+			name: "openrouter alone", cfg: config{OpenRouterKey: "openrouter-key"},
+			wantNames: []string{"openrouter", "ollama"}, wantStart: "openrouter",
+		},
+		{
+			name: "both new providers", cfg: config{OpenAIKey: "openai-key", OpenRouterKey: "openrouter-key"},
+			wantNames: []string{"openai", "openrouter", "ollama"}, wantStart: "openai",
+		},
+		{
+			name:      "existing anthropic precedence",
+			cfg:       config{AnthropicKey: "anthropic-key", OpenAIKey: "openai-key", OpenRouterKey: "openrouter-key"},
+			wantNames: []string{"anthropic", "openai", "openrouter", "ollama"}, wantStart: "anthropic",
+		},
+		{
+			name:      "existing explicit ollama URL precedence",
+			cfg:       config{AnthropicKey: "anthropic-key", OpenAIKey: "openai-key", OpenRouterKey: "openrouter-key", OllamaURL: "http://localhost:11434"},
+			ollamaEnv: "http://localhost:11434",
+			wantNames: []string{"anthropic", "openai", "openrouter", "ollama"}, wantStart: "ollama",
+		},
+		{
+			name:      "existing explicit ollama model precedence",
+			cfg:       config{OpenAIKey: "openai-key", OpenRouterKey: "openrouter-key", OllamaModel: "local-model"},
+			wantNames: []string{"openai", "openrouter", "ollama"}, wantStart: "ollama", wantModel: "local-model",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OLLAMA_URL", tt.ollamaEnv)
+			providers, initial, model := createProviders(tt.cfg)
+			names := make([]string, 0, len(providers))
+			for _, p := range providers {
+				names = append(names, p.Name())
+			}
+			assert.Equal(t, tt.wantNames, names)
+			assert.Equal(t, tt.wantStart, initial.Name())
+			assert.Equal(t, tt.wantModel, model)
+		})
+	}
 }

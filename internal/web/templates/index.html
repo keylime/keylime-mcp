@@ -587,6 +587,8 @@
 
         const providerLabels = {
             'anthropic': 'Anthropic (Claude)',
+            'openai': 'OpenAI',
+            'openrouter': 'OpenRouter',
             'ollama': 'Ollama (Local)'
         };
 
@@ -650,8 +652,26 @@
                 }
 
                 if (!foundCurrent) {
-                    const first = modelSelector.querySelector('option:not([disabled])');
-                    if (first) first.selected = true;
+                    const first = !current.model && models.find(m => m.provider === current.provider);
+                    if (first) {
+                        const value = JSON.stringify({ provider: first.provider, model: first.id });
+                        const resp = await fetch('/api/model', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: value
+                        });
+                        if (!resp.ok) throw new Error('Failed to select model');
+                        modelSelector.value = value;
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.textContent = current.model
+                            ? `${current.model} (unavailable)`
+                            : 'No model selected';
+                        opt.disabled = true;
+                        opt.selected = true;
+                        modelSelector.appendChild(opt);
+                    }
                 }
 
                 modelSelector.disabled = false;
@@ -782,6 +802,7 @@
             });
 
             eventSource.addEventListener('error', (e) => {
+                if (typeof e.data !== 'string') return;
                 hideLoading();
                 appendHTML(e.data);
                 scrollToBottom();
@@ -796,7 +817,8 @@
                 setStatus('connected', 'Connected');
             });
 
-            eventSource.onerror = () => {
+            eventSource.onerror = (e) => {
+                if (typeof e.data === 'string') return;
                 setStatus('disconnected', 'Disconnected');
                 setTimeout(connect, 3000);
             };

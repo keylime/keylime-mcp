@@ -22,6 +22,8 @@ type config struct {
 	OllamaURL      string
 	OllamaModel    string
 	AnthropicKey   string
+	OpenAIKey      string
+	OpenRouterKey  string
 	MaskingEnabled bool
 }
 
@@ -95,6 +97,8 @@ func loadConfig() config {
 		OllamaURL:      getEnv("OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:    os.Getenv("OLLAMA_MODEL"),
 		AnthropicKey:   strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")),
+		OpenAIKey:      strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
+		OpenRouterKey:  strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY")),
 		MaskingEnabled: parseBool(getEnv("MASKING_ENABLED", "true")),
 	}
 }
@@ -114,10 +118,15 @@ func parseBool(s string) bool {
 func createProviders(cfg config) ([]agent.LLMProvider, agent.LLMProvider, string) {
 	var providers []agent.LLMProvider
 
-	var claudeProvider *agent.AnthropicProvider
 	if cfg.AnthropicKey != "" {
-		claudeProvider = agent.NewClaudeProvider(cfg.AnthropicKey)
+		claudeProvider := agent.NewClaudeProvider(cfg.AnthropicKey)
 		providers = append(providers, claudeProvider)
+	}
+	if cfg.OpenAIKey != "" {
+		providers = append(providers, agent.NewOpenAIProvider(cfg.OpenAIKey))
+	}
+	if cfg.OpenRouterKey != "" {
+		providers = append(providers, agent.NewOpenRouterProvider(cfg.OpenRouterKey))
 	}
 
 	ollamaProvider := agent.NewOllamaProvider(cfg.OllamaURL)
@@ -128,10 +137,11 @@ func createProviders(cfg config) ([]agent.LLMProvider, agent.LLMProvider, string
 		return providers, ollamaProvider, cfg.OllamaModel
 	}
 
-	if claudeProvider == nil {
-		log.Fatal("Set ANTHROPIC_API_KEY for Claude or OLLAMA_URL/OLLAMA_MODEL for local Ollama")
+	if len(providers) == 1 {
+		log.Fatal("Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY for a cloud provider, or OLLAMA_URL/OLLAMA_MODEL for local Ollama")
 	}
 
-	log.Printf("Using Claude provider")
-	return providers, claudeProvider, ""
+	initialProvider := providers[0]
+	log.Printf("Using %s provider", initialProvider.Name())
+	return providers, initialProvider, ""
 }

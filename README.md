@@ -59,10 +59,18 @@ Copy `.env.example` to `.env` and adjust:
 | `KEYLIME_TLS_ENABLED` | `true` | Enable mTLS for Keylime communication |
 | `KEYLIME_TLS_SERVER_NAME` | `localhost` | Expected server name in Keylime certificate SAN |
 | `ANTHROPIC_API_KEY` | -- | Required for Claude provider |
+| `OPENAI_API_KEY` | -- | Enables OpenAI via its Chat Completions API |
+| `OPENAI_MODEL_FILTER_REGEX` | Built-in chat model filter | Optional replacement regex for OpenAI model discovery; choose models supporting Chat Completions and tools |
+| `OPENROUTER_API_KEY` | -- | Enables OpenRouter via its OpenAI-compatible API |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint (for local LLM) |
 | `OLLAMA_MODEL` | -- | Ollama model name (e.g., `qwen2.5`) |
 | `MASKING_ENABLED` | `true` | Mask sensitive data before sending to LLM |
 | `PORT` | `3000` | Web UI port |
+
+For example, `OPENAI_MODEL_FILTER_REGEX='^(gpt-4o|gpt-4-turbo)$'` lists those
+OpenAI model IDs. For fine-tuned models, the filter matches the base model ID.
+It does not affect OpenRouter. An unset or blank value keeps the default filter;
+an invalid regex reports a model-discovery error.
 
 ## Commands
 

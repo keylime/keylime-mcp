@@ -28,4 +28,5 @@ type ChatOptions struct {
 type LLMResponse struct {
 	TextBlocks []string
 	ToolUses   []ToolRequest
+	reasoning  *reasoningData
 }

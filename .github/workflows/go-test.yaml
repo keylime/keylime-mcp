@@ -17,11 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Go
-        run: dnf -y install golang
+      - name: Install test dependencies
+        run: dnf -y install golang nodejs
 
       - name: Run tests
-        run: go test ./internal/keylime/... ./internal/mcptools/... ./cmd/server/... -race -count=1
+        run: go test ./internal/... ./cmd/... -race -count=1
+
+      - name: Run web tests
+        run: node --test internal/web/*.test.cjs
 
     container:
       image: fedora:latest
