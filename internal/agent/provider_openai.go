@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,10 +19,8 @@ import (
 
 const providerOpenRouter = "openrouter"
 
-// OpenAI's model list has no endpoint capability metadata. Keep discovery
-// conservative: specialized and unknown model families must not appear as chat
-// choices by default. OPENAI_MODEL_FILTER_REGEX can override this filter.
-var openAIChatModel = regexp.MustCompile(`^(gpt-(4o|4\.1|5(\.[0-9]+)?)(-(mini|nano))?(-[0-9]{4}-[0-9]{2}-[0-9]{2}|-chat-latest)?|(o1|o[34](-mini)?)(-[0-9]{4}-[0-9]{2}-[0-9]{2})?)$`)
+// Exclude known specialized categories without pinning language model versions.
+var openAIExcludedModel = regexp.MustCompile(`(?i)(^|[-/])(embeddings?|image|audio|realtime|live|tts|transcribe|transcription|moderation|whisper|sora|dall-e|davinci|babbage|instruct|search|pro|codex|research|computer-use)([-/]|$)|^o1-(mini|preview)(-|$)|^chatgpt-4o-latest$`)
 
 // OpenAIProvider adapts OpenAI-compatible Chat Completions APIs.
 type OpenAIProvider struct {
@@ -92,8 +91,9 @@ func newOpenAIProvider(name, apiKey, baseURL string) *OpenAIProvider {
 func (p *OpenAIProvider) Name() string { return p.name }
 
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
-	filter := openAIChatModel
-	if p.name == "openai" {
+	isOpenAI := p.name == "openai"
+	var filter *regexp.Regexp
+	if isOpenAI {
 		if pattern := strings.TrimSpace(os.Getenv("OPENAI_MODEL_FILTER_REGEX")); pattern != "" {
 			var err error
 			filter, err = regexp.Compile(pattern)
@@ -114,7 +114,10 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		return nil, fmt.Errorf("failed to list %s models: %w", p.name, err)
 	}
 	var page struct {
-		Data  []struct{ ID string }
+		Data []struct {
+			ID      string
+			Created int64
+		}
 		Error *openAIError
 	}
 	if err := json.Unmarshal(raw, &page); err != nil {
@@ -126,15 +129,16 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	if page.Data == nil {
 		return nil, fmt.Errorf("%s returned an invalid model list", p.name)
 	}
+	if isOpenAI {
+		sort.SliceStable(page.Data, func(i, j int) bool { return page.Data[i].Created > page.Data[j].Created })
+	}
 	models := make([]ModelInfo, 0, len(page.Data))
 	for _, model := range page.Data {
 		if strings.TrimSpace(model.ID) == "" {
 			return nil, fmt.Errorf("%s returned an empty model ID", p.name)
 		}
-		if p.name == "openai" {
-			if !filter.MatchString(openAIBaseModel(model.ID)) {
-				continue
-			}
+		if isOpenAI && !openAIModelMatches(model.ID, filter) {
+			continue
 		}
 		models = append(models, ModelInfo{
 			ID:          model.ID,
@@ -143,6 +147,14 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		})
 	}
 	return models, nil
+}
+
+func openAIModelMatches(id string, filter *regexp.Regexp) bool {
+	base := openAIBaseModel(id)
+	if filter != nil {
+		return filter.MatchString(base)
+	}
+	return !openAIExcludedModel.MatchString(base)
 }
 
 func (p *OpenAIProvider) Chat(ctx context.Context, opts ChatOptions) (*LLMResponse, error) {

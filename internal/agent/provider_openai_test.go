@@ -60,7 +60,7 @@ func TestOpenAIListModels(t *testing.T) {
 				assert.Equal(t, http.MethodGet, r.Method)
 				assert.Equal(t, tt.url, r.URL.String())
 				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
-				return http.StatusOK, `{"object":"list","data":[{"id":"gpt-4o","object":"model","created":1,"owned_by":"vendor"},{"id":"gpt-4.1","object":"model","created":2,"owned_by":"vendor"}]}`
+				return http.StatusOK, `{"object":"list","data":[{"id":"gpt-4o","object":"model","created":2,"owned_by":"vendor"},{"id":"gpt-4.1","object":"model","created":1,"owned_by":"vendor"}]}`
 			})
 
 			models, err := p.ListModels(context.Background())
@@ -75,19 +75,27 @@ func TestOpenAIListModels(t *testing.T) {
 	}
 }
 
-func TestOpenAIListModelsFiltersUnsupportedModels(t *testing.T) {
+func TestOpenAIListModelsUsesNewestCatalogEntries(t *testing.T) {
 	t.Setenv("OPENAI_MODEL_FILTER_REGEX", "")
-	p := NewOpenAIProvider("test-key")
-	stubOpenAIHTTP(p, func(*http.Request) (int, string) {
-		return http.StatusOK, `{"data":[{"id":"text-embedding-3-small"},{"id":"whisper-1"},{"id":"gpt-image-1"},{"id":"gpt-4o-realtime-preview"},{"id":"gpt-4o-audio-preview"},{"id":"gpt-5-pro"},{"id":"gpt-5-codex"},{"id":"gpt-4o-search-preview"},{"id":"o3-deep-research"},{"id":"chatgpt-4o-latest"},{"id":"o1-mini"},{"id":"o1-mini-2024-09-12"},{"id":"o1-preview"},{"id":"unknown-future-model"},{"id":"gpt-4o"},{"id":"gpt-4.1-mini-2025-04-14"},{"id":"gpt-5-mini"},{"id":"o4-mini"},{"id":"ft:gpt-4o-2024-08-06:org:custom:id"}]}`
-	})
-	models, err := p.ListModels(context.Background())
-	require.NoError(t, err)
-	ids := make([]string, 0, len(models))
-	for _, model := range models {
-		ids = append(ids, model.ID)
+	for _, factory := range []func(string) *OpenAIProvider{NewOpenAIProvider, NewOpenRouterProvider} {
+		p := factory("test-key")
+		t.Run(p.Name(), func(t *testing.T) {
+			stubOpenAIHTTP(p, func(*http.Request) (int, string) {
+				return http.StatusOK, `{"data":[{"id":"gpt-4o","created":10},{"id":"gpt-99-new-variant","created":30},{"id":"future-language-model","created":40},{"id":"text-embedding-3-small","created":50},{"id":"gpt-image-new","created":60},{"id":"o1-mini"},{"id":"o1-preview"},{"id":"chatgpt-4o-latest"},{"id":"o1-mini-2024-09-12"},{"id":"o1-preview-2024-09-12"},{"id":"ft:o1-mini-2024-09-12:org:custom:id"}]}`
+			})
+			models, err := p.ListModels(context.Background())
+			require.NoError(t, err)
+			ids := make([]string, 0, len(models))
+			for _, m := range models {
+				ids = append(ids, m.ID)
+			}
+			want := []string{"future-language-model", "gpt-99-new-variant", "gpt-4o"}
+			if p.Name() == "openrouter" {
+				want = []string{"gpt-4o", "gpt-99-new-variant", "future-language-model", "text-embedding-3-small", "gpt-image-new", "o1-mini", "o1-preview", "chatgpt-4o-latest", "o1-mini-2024-09-12", "o1-preview-2024-09-12", "ft:o1-mini-2024-09-12:org:custom:id"}
+			}
+			assert.Equal(t, want, ids)
+		})
 	}
-	assert.Equal(t, []string{"gpt-4o", "gpt-4.1-mini-2025-04-14", "gpt-5-mini", "o4-mini", "ft:gpt-4o-2024-08-06:org:custom:id"}, ids)
 }
 
 func TestOpenAIModelFilterOverride(t *testing.T) {
@@ -99,8 +107,8 @@ func TestOpenAIModelFilterOverride(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		{"default", NewOpenAIProvider, "", []string{"gpt-4o"}, false},
-		{"blank uses default", NewOpenAIProvider, " \t", []string{"gpt-4o"}, false},
+		{"default", NewOpenAIProvider, "", []string{"gpt-4o", "gpt-4-turbo", "future-chat-family", "ft:gpt-4-turbo:org:custom:id"}, false},
+		{"blank uses default", NewOpenAIProvider, " \t", []string{"gpt-4o", "gpt-4-turbo", "future-chat-family", "ft:gpt-4-turbo:org:custom:id"}, false},
 		{"custom chat families", NewOpenAIProvider, `^(gpt-4-turbo|future-chat-family)$`, []string{"gpt-4-turbo", "future-chat-family", "ft:gpt-4-turbo:org:custom:id"}, false},
 		{"invalid regex", NewOpenAIProvider, "[", nil, true},
 		{"openrouter ignores override", NewOpenRouterProvider, `^gpt-4o$`, allIDs, false},
